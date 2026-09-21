@@ -1,0 +1,38 @@
+import { useSearchParams } from 'react-router-dom'
+
+export function useNoticeOverlay() {
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const openNotice = (noticeId: string) => {
+    const next = new URLSearchParams(searchParams)
+    next.set('notice', noticeId)
+    setSearchParams(next)
+  }
+
+  const closeNotice = () => {
+    const next = new URLSearchParams(searchParams)
+    next.delete('notice')
+    setSearchParams(next, { replace: true })
+  }
+
+  const openProfile = () => {
+    const next = new URLSearchParams(searchParams)
+    next.set('profile', 'edit')
+    setSearchParams(next)
+  }
+
+  const closeProfile = () => {
+    const next = new URLSearchParams(searchParams)
+    next.delete('profile')
+    setSearchParams(next, { replace: true })
+  }
+
+  return {
+    noticeId: searchParams.get('notice'),
+    isProfileOpen: searchParams.get('profile') === 'edit',
+    openNotice,
+    closeNotice,
+    openProfile,
+    closeProfile,
+  }
+}
