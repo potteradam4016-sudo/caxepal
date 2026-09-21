@@ -1,0 +1,41 @@
+# 예시 파일입니다. 검토 후 저장소 루트 .github/workflows/backend-ci.yml로 복사합니다.
+# backend/docs에 있는 상태로는 GitHub Actions가 실행되지 않습니다.
+# 이 예시의 Windows/Linux 원격 작업을 제작 환경에서 실행했다는 뜻은 아닙니다.
+name: 백엔드 자동 검증
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.11", "3.13"]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - name: 패키지 설치
+        run: python -m pip install -r requirements-dev.txt
+      - name: Python 문법 검사
+        run: python -m compileall -q app start.py scripts tests
+      - name: 자동 테스트와 실제 HTTP 흐름 검증
+        run: python -m pytest
+      - name: Windows 시작 파일의 첫 준비 확인
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: START.cmd --dev --setup-only < NUL
