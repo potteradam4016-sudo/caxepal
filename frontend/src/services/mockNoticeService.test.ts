@@ -22,13 +22,19 @@ describe('mockNoticeService', () => {
     await mockNoticeService.toggleFavorite('career-mentoring', true)
     const schedules = await mockNoticeService.getFavoriteSchedules()
 
-    expect(JSON.parse(localStorage.getItem(storageKeys.favorites) ?? '[]')).toContain('career-mentoring')
+    expect(JSON.parse(localStorage.getItem(storageKeys.favorites()) ?? '[]')).toContain('career-mentoring')
     expect(schedules.undated.map((notice) => notice.id)).toContain('career-mentoring')
     expect(schedules.events.some((event) => event.noticeId === 'ai-project' && event.label === '신청 마감')).toBe(true)
   })
 
   it('falls back safely when persisted profile is invalid', async () => {
-    localStorage.setItem(storageKeys.profile, '{broken json')
+    localStorage.setItem(storageKeys.profile(), '{broken json')
     await expect(mockNoticeService.getProfile()).resolves.toMatchObject({ department: '컴퓨터공학과' })
+  })
+
+  it('keeps favorites separated by username', async () => {
+    await mockNoticeService.toggleFavorite('career-mentoring', true, 'userone')
+    expect(mockNoticeService.getFavoriteIds('userone')).toContain('career-mentoring')
+    expect(mockNoticeService.getFavoriteIds('usertwo')).not.toContain('career-mentoring')
   })
 })

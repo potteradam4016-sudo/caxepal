@@ -44,10 +44,24 @@ export interface Notice {
 
 export interface Profile {
   department: string
-  grade: '1학년' | '2학년' | '3학년' | '4학년'
+  grade: '1학년' | '2학년' | '3학년' | '4학년' | '5학년 이상'
   enrollmentStatus: '재학' | '휴학' | '기타'
   interests: string[]
   activityTypes: string[]
+}
+
+export interface AcademicProfile {
+  department: string
+  grade: Profile['grade']
+  enrollmentStatus: Profile['enrollmentStatus']
+}
+
+export interface AuthUser {
+  username: string
+  onboardingCompleted: boolean
+  academicDraft: AcademicProfile | null
+  preferenceDraft: Pick<Profile, 'interests' | 'activityTypes'>
+  profile: Profile | null
 }
 
 export interface NoticeFilters {

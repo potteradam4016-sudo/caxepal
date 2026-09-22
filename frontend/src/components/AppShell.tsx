@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import { useNoticeOverlay } from '../hooks/useNoticeOverlay'
 import { NoticeDetailModal } from './NoticeDetailModal'
 import { ProfileModal } from './ProfileModal'
@@ -11,12 +12,18 @@ const navItems = [
 
 export function AppShell() {
   const overlay = useNoticeOverlay()
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+  const handleLogout = () => {
+    logout()
+    navigate('/login', { replace: true })
+  }
   return (
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
           <span className="brand__mark">
-            <img src="/icons/SCNU_PICK_icon.png" alt="" />
+            <img src="/icons/SCNU_PICK_icon.png?v=20260922-2" alt="" />
           </span>
           <div>SCNU PICK<small>교내 공지 추천 서비스</small></div>
         </div>
@@ -28,8 +35,9 @@ export function AppShell() {
           ))}
         </nav>
         <div className="sidebar__profile">
-          <p><b>내 추천 정보</b><span>학적과 관심사를 관리해요</span></p>
+          <p><b>{user?.profile?.department ?? '내 추천 정보'}</b><span>{user?.username}</span></p>
           <button className="sidebar__profile-button" type="button" onClick={overlay.openProfile}>내 정보 수정</button>
+          <button className="sidebar__logout" type="button" onClick={handleLogout}>로그아웃</button>
         </div>
       </aside>
       <main className="main-content"><Outlet context={overlay} /></main>

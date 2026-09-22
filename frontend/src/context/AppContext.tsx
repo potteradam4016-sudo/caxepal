@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { mockNoticeService } from '../services/mockNoticeService'
 import type { Profile } from '../types'
+import { useAuth } from './AuthContext'
 
 interface AppContextValue {
   favorites: Set<string>
@@ -15,15 +16,12 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null)
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [favorites, setFavorites] = useState(() => new Set(mockNoticeService.getFavoriteIds()))
+  const { user, updateProfile } = useAuth()
+  const [favorites, setFavorites] = useState(() => new Set(mockNoticeService.getFavoriteIds(user?.username)))
   const [favoritePending, setFavoritePending] = useState(new Set<string>())
-  const [profile, setProfile] = useState<Profile | null>(null)
+  const [savedProfile, setSavedProfile] = useState<Profile | null>(null)
   const [profileRevision, setProfileRevision] = useState(0)
   const [toast, setToast] = useState<{ message: string; tone: 'default' | 'error' } | null>(null)
-
-  useEffect(() => {
-    void mockNoticeService.getProfile().then(setProfile)
-  }, [])
 
   useEffect(() => {
     if (!toast) return
@@ -48,7 +46,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       })
 
       try {
-        const saved = await mockNoticeService.toggleFavorite(id, !wasFavorite)
+        const saved = await mockNoticeService.toggleFavorite(id, !wasFavorite, user?.username)
         setFavorites(new Set(saved))
         showToast(wasFavorite ? '찜을 해제했어요.' : '찜에 추가했어요. 캘린더에 일정이 연결됩니다.')
       } catch {
@@ -67,19 +65,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
         })
       }
     },
-    [favoritePending, favorites, showToast],
+    [favoritePending, favorites, showToast, user],
   )
 
   const saveProfile = useCallback(
     async (nextProfile: Profile) => {
-      const saved = await mockNoticeService.updateProfile(nextProfile)
-      setProfile(saved)
+      const saved = await updateProfile(nextProfile)
+      await mockNoticeService.updateProfile(saved, user?.username)
+      setSavedProfile(saved)
       setProfileRevision((value) => value + 1)
       showToast('저장했어요. 추천 결과를 새 정보 기준으로 갱신했습니다.')
     },
-    [showToast],
+    [showToast, updateProfile, user],
   )
 
+  const profile = savedProfile ?? user?.profile ?? null
   const value = useMemo(
     () => ({ favorites, favoritePending, profile, profileRevision, toggleFavorite, saveProfile, showToast }),
     [favorites, favoritePending, profile, profileRevision, toggleFavorite, saveProfile, showToast],

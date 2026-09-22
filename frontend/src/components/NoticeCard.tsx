@@ -50,7 +50,7 @@ export function NoticeCard({
           <h2>{notice.title}</h2>
           <div className="badges">
             {showRecommendation && notice.recommendationScore !== null && (
-              <span className="badge badge--score">추천도 {notice.recommendationScore}%</span>
+              <span className="badge badge--score">{notice.recommendationScore <= 3 ? `조건 일치 ${notice.recommendationScore}/3` : `추천도 ${notice.recommendationScore}%`}</span>
             )}
             {notice.isDeadlineSoon && <span className="badge badge--deadline">마감 임박</span>}
             {!showRecommendation && <span className="badge">{notice.categories[0]}</span>}

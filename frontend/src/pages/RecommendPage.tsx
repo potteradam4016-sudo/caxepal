@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { DevScenarioPanel } from '../components/DevScenarioPanel'
 import { NoticeCard } from '../components/NoticeCard'
@@ -13,13 +13,14 @@ const FILTER_CATEGORIES = NOTICE_CATEGORIES.filter((category) => category !== 'ì
 
 export function RecommendPage() {
   const overlay = useOutletContext<ReturnType<typeof useNoticeOverlay>>()
-  const { favorites, favoritePending, toggleFavorite, profileRevision } = useApp()
+  const { favorites, favoritePending, toggleFavorite, profile, profileRevision } = useApp()
   const [query, setQuery] = useState('')
   const [categories, setCategories] = useState<NoticeCategory[]>([])
   const [deadlineSoon, setDeadlineSoon] = useState(false)
   const [scenario, setScenario] = useState<AsyncState>('success')
   const filters = useMemo<NoticeFilters>(() => ({ query, categories, deadlineSoon }), [query, categories, deadlineSoon])
-  const { notices, loading, error, retry } = useNotices(mockNoticeService.listRecommended, filters, profileRevision)
+  const loadRecommendations = useCallback((nextFilters: NoticeFilters) => mockNoticeService.listRecommended(nextFilters, profile ?? undefined), [profile])
+  const { notices, loading, error, retry } = useNotices(loadRecommendations, filters, profileRevision)
 
   const reset = () => {
     setQuery('')

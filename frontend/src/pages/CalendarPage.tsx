@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { ViewState } from '../components/ViewState'
 import { useApp } from '../context/AppContext'
+import { useAuth } from '../context/AuthContext'
 import type { useNoticeOverlay } from '../hooks/useNoticeOverlay'
 import { mockNoticeService } from '../services/mockNoticeService'
 import type { CalendarEvent, FavoriteSchedules } from '../types'
@@ -11,6 +12,7 @@ const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
 export function CalendarPage() {
   const overlay = useOutletContext<ReturnType<typeof useNoticeOverlay>>()
   const { favorites } = useApp()
+  const { user } = useAuth()
   const [cursor, setCursor] = useState(() => new Date(2026, 8, 1))
   const [data, setData] = useState<FavoriteSchedules>({ events: [], undated: [] })
   const [loading, setLoading] = useState(true)
@@ -25,13 +27,13 @@ export function CalendarPage() {
           setLoading(true)
           setError(false)
         }
-        return mockNoticeService.getFavoriteSchedules()
+        return mockNoticeService.getFavoriteSchedules(user?.username)
       })
       .then((result) => { if (active) setData(result) })
       .catch(() => { if (active) setError(true) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [favorites, revision])
+  }, [favorites, revision, user?.username])
 
   const changeMonth = useCallback((amount: number) => {
     setCursor((current) => new Date(current.getFullYear(), current.getMonth() + amount, 1))
