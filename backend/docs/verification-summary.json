@@ -1,0 +1,107 @@
+{
+  "release": "2026-09-21-ko-full",
+  "description": "한국어 문서와 실행 수정본을 합친 백엔드 전체 통합본",
+  "tested_at": "2026-09-21T02:45:52.350603+09:00",
+  "environment": {
+    "os": "Linux",
+    "architecture": "x86_64",
+    "python": "3.13.5",
+    "sqlite": "3.46.1",
+    "dependency_mode": "이미 설치된 패키지 사용; 새 가상환경 온라인 설치 아님"
+  },
+  "automated_tests": {
+    "passed": 106,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "command": "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -o addopts= -q",
+    "exit_code": 0
+  },
+  "live_http": {
+    "host": "127.0.0.1",
+    "port": 3104,
+    "requests": 55,
+    "all_expected_statuses_matched": true,
+    "temporary_data_only": true,
+    "external_services_used": false
+  },
+  "launcher": {
+    "checks": [
+      {
+        "name": "fresh_setup_missing_parent_unicode_space_path",
+        "passed": true,
+        "exit_code": 0
+      },
+      {
+        "name": "repeat_setup_preserves_env",
+        "passed": true,
+        "exit_code": 0
+      },
+      {
+        "name": "blank_secret_key_fails_with_diagnostic",
+        "passed": true,
+        "exit_code": 1
+      },
+      {
+        "name": "occupied_port_exits_with_failure",
+        "passed": true,
+        "exit_code": 1
+      },
+      {
+        "name": "launcher_serves_health_and_ctrl_c_cleans_up",
+        "passed": true,
+        "exit_code": 0,
+        "port": 51745
+      },
+      {
+        "name": "api_is_unreachable_after_launcher_exit",
+        "passed": true
+      }
+    ],
+    "dependency_mode": "existing installed interpreter via test-only wrapper; no online installation",
+    "native_windows_cmd_executed": false
+  },
+  "documents": {
+    "markdown_count": 13,
+    "korean_titles_and_prose_reviewed": true,
+    "local_links_checked": true,
+    "openapi_matches_code": true,
+    "openapi_paths": 26,
+    "openapi_operations": 29
+  },
+  "other_checks": {
+    "python_compile": true,
+    "sqlite_migration": true,
+    "sqlite_metadata_diff": [],
+    "postgresql_offline_ddl_only": true,
+    "start_cmd_ascii_crlf": true
+  },
+  "not_verified": [
+    "Windows의 START.cmd 실제 실행",
+    "새 가상환경의 온라인 패키지 설치",
+    "실제 학교 세 게시판 수집·적재와 추출 정확도",
+    "실제 SMTP 배달",
+    "실제 외부 AI 호출",
+    "실제 PostgreSQL·권한·사용자별 RLS·동시성",
+    "Docker·학교 서버·클라우드 배포",
+    "원격 GitHub Actions 실행",
+    "프론트엔드 연동·브라우저 화면",
+    "대규모 부하·독립 보안 심사"
+  ],
+  "network_probe": {
+    "pypi": "DNS 실패: Temporary failure in name resolution",
+    "school": "DNS 실패: Temporary failure in name resolution"
+  },
+  "notes": [
+    "기대한 401·403·409·422 등의 거부 응답도 정상 검증에 포함됩니다.",
+    "공지·시험 계정·메일은 임시 폴더에서 생성 후 삭제했으며 배포 파일에 포함하지 않습니다.",
+    "온라인 기술 문서 확인과 코드 실행 환경의 외부 연결 성공은 다른 항목입니다."
+  ],
+  "package": {
+    "files": 84,
+    "markdown_documents": 13,
+    "root": "backend",
+    "frontend_included": false,
+    "private_runtime_files_included": false
+  }
+}
