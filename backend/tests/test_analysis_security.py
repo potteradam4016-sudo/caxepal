@@ -95,11 +95,51 @@ def test_manual_review_requires_current_hash(client,user_factory,notice_factory,
     assert r.status_code == 200 and r.json()["analysis"]["provider"]=="manual"
     assert r.json()["needs_review"] is False
 
-def test_cors_is_explicit(client):
-    a=client.options("/api/notices",headers={"Origin":"http://localhost:5173","Access-Control-Request-Method":"GET"})
-    b=client.options("/api/notices",headers={"Origin":"https://evil.example","Access-Control-Request-Method":"GET"})
-    assert a.headers.get("access-control-allow-origin")=="http://localhost:5173"
-    assert "access-control-allow-origin" not in b.headers
+@pytest.mark.parametrize("origin", ["http://localhost:5173", "http://127.0.0.1:5173"])
+def test_cors_allows_vite_development_origins(client, origin):
+    response = client.options("/api/notices", headers={
+        "Origin": origin,
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers": "Authorization, Content-Type",
+    })
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == origin
+    allowed_headers = response.headers["access-control-allow-headers"].lower()
+    assert "authorization" in allowed_headers
+    assert "content-type" in allowed_headers
+    assert "access-control-allow-credentials" not in response.headers
+
+@pytest.mark.parametrize("method", ["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+def test_cors_preflight_allows_api_methods(client, method):
+    response = client.options("/api/notices", headers={
+        "Origin": "http://localhost:5173",
+        "Access-Control-Request-Method": method,
+    })
+    assert response.status_code == 200
+    assert method in response.headers["access-control-allow-methods"].split(", ")
+
+@pytest.mark.parametrize("origin", ["http://localhost:3000", "https://evil.example"])
+def test_cors_rejects_unlisted_origins(client, origin):
+    response = client.options("/api/notices", headers={
+        "Origin": origin,
+        "Access-Control-Request-Method": "GET",
+    })
+    assert response.status_code == 400
+    assert "access-control-allow-origin" not in response.headers
+
+@pytest.mark.parametrize("path, status", [("/health", 200), ("/api/auth/me", 401)])
+def test_cors_headers_are_present_on_actual_responses(client, path, status):
+    response = client.get(path, headers={"Origin": "http://localhost:5173"})
+    assert response.status_code == status
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+    exposed = response.headers["access-control-expose-headers"].lower()
+    assert "x-request-id" in exposed
+    assert "retry-after" in exposed
+    assert "access-control-allow-credentials" not in response.headers
+
+def test_default_cors_origins_are_vite_only():
+    settings = Settings(_env_file=None, secret_key="x"*40)
+    assert settings.origins == ["http://localhost:5173", "http://127.0.0.1:5173"]
 
 def test_security_headers(client):
     r=client.get("/api/notices")

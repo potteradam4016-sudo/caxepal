@@ -35,6 +35,20 @@ JWT가 아닙니다. Supabase Auth 토큰도 아닙니다.
 쿠키/BFF 방식으로 바꾸려면 CSRF·쿠키 속성·CORS·갱신 계약도 함께 변경해야 합니다.
 현재 서버는 쿠키 인증을 구현하지 않았고 `allow_credentials=False`입니다.
 
+### 로컬 CORS 설정
+
+로컬 프론트엔드 개발 서버는 `http://localhost:5173` 또는
+`http://127.0.0.1:5173`을 사용합니다. 백엔드의 `CORS_ORIGINS`에는 브라우저가
+접속한 프론트 origin을 정확히 등록해야 하며 경로나 후행 `/`를 넣지 않습니다.
+백엔드 API 요청 대상인 `http://localhost:3104`는 허용 origin이 아니라 프론트의
+API base URL입니다.
+
+브라우저 preflight에서는 현재 API가 사용하는 `GET`, `POST`, `PUT`, `DELETE`,
+`OPTIONS`와 `Authorization`, `Content-Type` 헤더만 허용합니다. 응답에서
+`X-Request-ID`, `Retry-After`를 읽을 수 있습니다. 와일드카드 origin은 허용하지
+않으며 등록되지 않은 origin의 preflight는 거부합니다. 운영 환경에서는 실제
+HTTPS 프론트 주소를 `CORS_ORIGINS`와 `FRONTEND_URL`에 명시합니다.
+
 ## 2. 인증 API
 
 아이디는 영문 소문자로 시작하는 영문 소문자·숫자·밑줄 3~32자입니다. 입력은 양쪽 공백을 제거하고 소문자로 통일합니다. 비밀번호는 가입·변경 시 12~128자입니다.
