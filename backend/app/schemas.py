@@ -1,6 +1,6 @@
 from datetime import date, time
 from typing import Literal
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Status = Literal["enrolled", "on_leave", "graduating", "graduated"]
 SourceCode = Literal["SCNU_MAIN", "SCNU_SW", "SCNU_AI"]
@@ -9,24 +9,22 @@ Category = Literal["contest", "education", "scholarship", "career", "startup", "
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=False)
 
-class EmailInput(StrictModel):
-    email: EmailStr
-    @field_validator("email")
+class UsernameInput(StrictModel):
+    username: str = Field(min_length=3, max_length=32, pattern=r"^[a-z][a-z0-9_]*$")
+    @field_validator("username", mode="before")
     @classmethod
-    def normalize_email(cls, value):
-        return str(value).strip().casefold()
+    def normalize_username(cls, value):
+        return value.strip().casefold() if isinstance(value, str) else value
 
-class Credentials(EmailInput):
+class Credentials(UsernameInput):
     password: str = Field(min_length=12, max_length=128)
 
-class LoginInput(EmailInput):
+class LoginInput(UsernameInput):
     password: str = Field(min_length=1, max_length=128)
 
-class TokenInput(StrictModel):
-    token: str = Field(min_length=32, max_length=256)
-
-class ResetInput(TokenInput):
-    password: str = Field(min_length=12, max_length=128)
+class ChangePasswordInput(StrictModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=12, max_length=128)
 
 class PasswordInput(StrictModel):
     password: str = Field(min_length=1, max_length=128)
@@ -36,8 +34,7 @@ class MessageOut(BaseModel):
 
 class UserOut(BaseModel):
     id: str
-    email: str
-    email_verified: bool
+    username: str
     is_admin: bool
     onboarding_complete: bool
 

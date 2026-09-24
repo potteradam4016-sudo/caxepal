@@ -48,7 +48,7 @@ def test_calendar_overlap_labels_and_expired_application(client,user_factory,not
 
 def test_calendar_no_dates_and_ownership(client,user_factory,notice_factory):
     alice,_=user_factory()
-    bob,_=user_factory("bob@example.com")
+    bob,_=user_factory("bob")
     ident=notice_factory(body="일정은 추후 안내합니다.")
     client.post(f"/api/bookmarks/{ident}",headers=alice)
     assert client.get("/api/calendar?month=2026-09",headers=alice).json()["undated"][0]["notice_id"] == ident
@@ -62,3 +62,4 @@ def test_calendar_lone_end_is_point_with_null_start(client,user_factory,notice_f
     e=client.get("/api/calendar?month=2070-09",headers=headers).json()["events"][0]
     assert e["start_date"] is None and e["is_partial"]
     assert e["display_start"]==e["display_end"]=="2070-09-30"
+

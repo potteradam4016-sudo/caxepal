@@ -24,7 +24,7 @@ def test_profile_version_conflict(client,user_factory):
 
 def test_profile_ownership_not_accepted_in_payload(client,user_factory):
     headers, _ = user_factory()
-    other, otherid = user_factory("bob@example.com")
+    other, otherid = user_factory("bob")
     body={"department":"컴퓨터공학과","grade":3,"academic_status":"enrolled",
           "interest_ids":["ai_sw","hackathon"],"user_id":otherid}
     assert client.put("/api/profile",headers=headers,json=body).status_code == 422
@@ -62,7 +62,7 @@ def test_static_route_and_pagination(client,notice_factory):
 
 def test_bookmark_idempotence_and_isolation(client,user_factory,notice_factory):
     alice,_ = user_factory()
-    bob,_ = user_factory("bob@example.com")
+    bob,_ = user_factory("bob")
     ident=notice_factory()
     assert client.post(f"/api/bookmarks/{ident}",headers=alice).status_code == 204
     assert client.post(f"/api/bookmarks/{ident}",headers=alice).status_code == 204
@@ -93,3 +93,4 @@ def test_invalid_optional_token_does_not_become_anonymous(client):
 
 def test_only_three_source_codes_accepted(client):
     assert client.get("/api/notices?source=SCNU_GLOCAL").status_code == 422
+

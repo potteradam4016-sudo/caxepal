@@ -1,389 +1,68 @@
 {
-  "purpose": "임시 합성 자료와 실제 로컬 HTTP 요청 검증",
-  "real_school_crawl": false,
-  "real_smtp": false,
-  "real_external_ai": false,
-  "uses_existing_user_database": false,
-  "port": 3104,
-  "openapi_paths": 26,
   "passed": true,
-  "checks": [
-    {
-      "name": "새 DB 상위 폴더 생성·마이그레이션 반복·스키마 일치·초기 공지 0건",
-      "passed": true
-    },
-    {
-      "name": "실제 DB와 분리한 합성 공지 3건 구성",
-      "passed": true
-    },
-    {
-      "name": "서버 상태·Swagger·OpenAPI·공개 사전·비인증 요청 거부",
-      "passed": true
-    },
-    {
-      "name": "가입·개발 메일 확인·일회용 토큰·로그인·미완성 프로필 거부",
-      "passed": true
-    },
-    {
-      "name": "프로필 저장·수정 충돌·추천 점수와 이유·마감 제외·검색·신규 정렬",
-      "passed": true
-    },
-    {
-      "name": "찜 중복 방지·사용자 격리·신청/행사 분리·월 경계·일정 미정",
-      "passed": true
-    },
-    {
-      "name": "관심사 변경 시 추천 재계산·기존 찜 보존",
-      "passed": true
-    },
-    {
-      "name": "관리자 권한·기본 수집 차단·허용/비허용 CORS",
-      "passed": true
-    },
-    {
-      "name": "비밀번호 재설정·기존 세션 폐기·로그아웃·본인 탈퇴",
-      "passed": true
-    },
-    {
-      "name": "검증 API·작업 처리기 종료",
-      "passed": true
-    },
-    {
-      "name": "임시 DB·시험 계정·개발 메일·로그 정리",
-      "passed": true
-    }
-  ],
+  "http_request_count": 12,
   "http_requests": [
     {
-      "method": "GET",
       "path": "/health",
-      "status": 200,
-      "expected": 200
+      "expected": 200,
+      "status": 200
     },
     {
-      "method": "GET",
-      "path": "/",
-      "status": 200,
-      "expected": 200
-    },
-    {
-      "method": "GET",
       "path": "/docs",
-      "status": 200,
-      "expected": 200
+      "expected": 200,
+      "status": 200
     },
     {
-      "method": "GET",
-      "path": "/openapi.json",
-      "status": 200,
-      "expected": 200
+      "path": "/api/auth/register",
+      "expected": 201,
+      "status": 201
     },
     {
-      "method": "GET",
-      "path": "/api/interests",
-      "status": 200,
-      "expected": 200
+      "path": "/api/auth/register",
+      "expected": 409,
+      "status": 409
     },
     {
-      "method": "GET",
-      "path": "/api/sources",
-      "status": 200,
-      "expected": 200
+      "path": "/api/auth/login",
+      "expected": 200,
+      "status": 200
     },
     {
-      "method": "GET",
-      "path": "/api/profile",
-      "status": 401,
-      "expected": 401
+      "path": "/api/auth/me",
+      "expected": 200,
+      "status": 200
     },
     {
-      "method": "GET",
+      "path": "/api/auth/change-password",
+      "expected": 401,
+      "status": 401
+    },
+    {
+      "path": "/api/auth/change-password",
+      "expected": 200,
+      "status": 200
+    },
+    {
+      "path": "/api/auth/me",
+      "expected": 401,
+      "status": 401
+    },
+    {
+      "path": "/api/auth/login",
+      "expected": 401,
+      "status": 401
+    },
+    {
+      "path": "/api/auth/login",
+      "expected": 200,
+      "status": 200
+    },
+    {
       "path": "/api/notices",
-      "status": 401,
-      "expected": 401
-    },
-    {
-      "method": "POST",
-      "path": "/api/auth/register",
-      "status": 202,
-      "expected": 202
-    },
-    {
-      "method": "POST",
-      "path": "/api/auth/login",
-      "status": 403,
-      "expected": 403
-    },
-    {
-      "method": "POST",
-      "path": "/api/auth/verify-email",
-      "status": 200,
-      "expected": 200
-    },
-    {
-      "method": "POST",
-      "path": "/api/auth/verify-email",
-      "status": 400,
-      "expected": 400
-    },
-    {
-      "method": "POST",
-      "path": "/api/auth/login",
-      "status": 200,
-      "expected": 200
-    },
-    {
-      "method": "POST",
-      "path": "/api/auth/register",
-      "status": 202,
-      "expected": 202
-    },
-    {
-      "method": "POST",
-      "path": "/api/auth/login",
-      "status": 403,
-      "expected": 403
-    },
-    {
-      "method": "POST",
-      "path": "/api/auth/verify-email",
-      "status": 200,
-      "expected": 200
-    },
-    {
-      "method": "POST",
-      "path": "/api/auth/verify-email",
-      "status": 400,
-      "expected": 400
-    },
-    {
-      "method": "POST",
-      "path": "/api/auth/login",
-      "status": 200,
-      "expected": 200
-    },
-    {
-      "method": "GET",
-      "path": "/api/auth/me",
-      "status": 200,
-      "expected": 200
-    },
-    {
-      "method": "GET",
-      "path": "/api/notices/recommended",
-      "status": 409,
-      "expected": 409
-    },
-    {
-      "method": "PUT",
-      "path": "/api/profile",
-      "status": 200,
-      "expected": 200
-    },
-    {
-      "method": "PUT",
-      "path": "/api/profile",
-      "status": 409,
-      "expected": 409
-    },
-    {
-      "method": "GET",
-      "path": "/api/notices/recommended",
-      "status": 200,
-      "expected": 200
-    },
-    {
-      "method": "GET",
-      "path": "/api/notices/new",
-      "status": 200,
-      "expected": 200
-    },
-    {
-      "method": "GET",
-      "path": "/api/notices?q=AI",
-      "status": 200,
-      "expected": 200
-    },
-    {
-      "method": "GET",
-      "path": "/api/notices?page=0",
-      "status": 422,
-      "expected": 422
-    },
-    {
-      "method": "GET",
-      "path": "/api/notices/999999",
-      "status": 404,
-      "expected": 404
-    },
-    {
-      "method": "POST",
-      "path": "/api/bookmarks/1",
-      "status": 204,
-      "expected": 204
-    },
-    {
-      "method": "POST",
-      "path": "/api/bookmarks/1",
-      "status": 204,
-      "expected": 204
-    },
-    {
-      "method": "POST",
-      "path": "/api/bookmarks/2",
-      "status": 204,
-      "expected": 204
-    },
-    {
-      "method": "POST",
-      "path": "/api/bookmarks/3",
-      "status": 204,
-      "expected": 204
-    },
-    {
-      "method": "GET",
-      "path": "/api/bookmarks",
-      "status": 200,
-      "expected": 200
-    },
-    {
-      "method": "GET",
-      "path": "/api/bookmarks",
-      "status": 200,
-      "expected": 200
-    },
-    {
-      "method": "DELETE",
-      "path": "/api/bookmarks/1",
-      "status": 204,
-      "expected": 204
-    },
-    {
-      "method": "GET",
-      "path": "/api/calendar?month=2070-09",
-      "status": 200,
-      "expected": 200
-    },
-    {
-      "method": "GET",
-      "path": "/api/calendar?month=2070-10",
-      "status": 200,
-      "expected": 200
-    },
-    {
-      "method": "GET",
-      "path": "/api/calendar?month=2070-13",
-      "status": 422,
-      "expected": 422
-    },
-    {
-      "method": "GET",
-      "path": "/api/notices/1",
-      "status": 200,
-      "expected": 200
-    },
-    {
-      "method": "PUT",
-      "path": "/api/profile",
-      "status": 200,
-      "expected": 200
-    },
-    {
-      "method": "GET",
-      "path": "/api/notices/recommended",
-      "status": 200,
-      "expected": 200
-    },
-    {
-      "method": "GET",
-      "path": "/api/bookmarks",
-      "status": 200,
-      "expected": 200
-    },
-    {
-      "method": "POST",
-      "path": "/api/admin/crawl-jobs",
-      "status": 403,
-      "expected": 403
-    },
-    {
-      "method": "GET",
-      "path": "/api/admin/crawl-jobs",
-      "status": 200,
-      "expected": 200
-    },
-    {
-      "method": "POST",
-      "path": "/api/admin/crawl-jobs",
-      "status": 403,
-      "expected": 403
-    },
-    {
-      "method": "OPTIONS",
-      "path": "/api/profile",
-      "status": 200,
-      "expected": 200
-    },
-    {
-      "method": "OPTIONS",
-      "path": "/api/profile",
-      "status": 400,
-      "expected": 400
-    },
-    {
-      "method": "POST",
-      "path": "/api/auth/forgot-password",
-      "status": 202,
-      "expected": 202
-    },
-    {
-      "method": "POST",
-      "path": "/api/auth/reset-password",
-      "status": 200,
-      "expected": 200
-    },
-    {
-      "method": "GET",
-      "path": "/api/auth/me",
-      "status": 401,
-      "expected": 401
-    },
-    {
-      "method": "POST",
-      "path": "/api/auth/login",
-      "status": 401,
-      "expected": 401
-    },
-    {
-      "method": "POST",
-      "path": "/api/auth/login",
-      "status": 200,
-      "expected": 200
-    },
-    {
-      "method": "POST",
-      "path": "/api/auth/logout",
-      "status": 204,
-      "expected": 204
-    },
-    {
-      "method": "GET",
-      "path": "/api/auth/me",
-      "status": 401,
-      "expected": 401
-    },
-    {
-      "method": "DELETE",
-      "path": "/api/auth/account",
-      "status": 204,
-      "expected": 204
-    },
-    {
-      "method": "GET",
-      "path": "/api/auth/me",
-      "status": 401,
-      "expected": 401
+      "expected": 200,
+      "status": 200
     }
   ],
-  "http_request_count": 55
+  "real_school_crawl": false,
+  "uses_existing_user_database": false
 }

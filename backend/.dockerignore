@@ -2,6 +2,7 @@
 .env.*
 !.env.example
 .venv
+.test-deps
 venv
 __pycache__
 .pytest_cache

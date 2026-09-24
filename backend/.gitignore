@@ -3,6 +3,7 @@
 !.env.example
 !.env.*.example
 .venv/
+.test-deps/
 venv/
 __pycache__/
 *.py[cod]
@@ -16,6 +17,7 @@ data/
 uploads/
 *.sqlite*
 *.db
+*.db-*
 *.log
 *.pem
 *.key

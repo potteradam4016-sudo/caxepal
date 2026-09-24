@@ -19,12 +19,12 @@ def check_limit(factory, secret: str, identity: str, limit: int, period: int = 9
         raise APIError(429, "RATE_LIMITED", "요청이 많습니다. 잠시 후 다시 시도해주세요.",
             headers={"Retry-After": str((window + 1) * period - now)})
 
-def auth_limit(request, email: str, action: str):
+def auth_limit(request, username: str, action: str):
     settings = request.app.state.settings
     client = request.client.host if request.client else "unknown"
-    # Separate buckets: distributed guessing and multi-address attacks are both bounded.
+    # Separate buckets bound guessing per account and per client address.
     for identity, limit in [
-        (f"auth:{action}:email:{email}", settings.auth_limit_per_15_minutes),
+        (f"auth:{action}:username:{username}", settings.auth_limit_per_15_minutes),
         (f"auth:{action}:ip:{client}", settings.auth_limit_per_15_minutes * 3),
     ]:
         check_limit(request.app.state.sessions, settings.secret_key, identity, limit)

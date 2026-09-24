@@ -16,6 +16,6 @@ def profile_payload(db, user_id: str) -> dict:
             "updated_at": profile.updated_at if profile else 0}
 
 def user_payload(db, user):
-    return {"id": user.id, "email": user.email, "email_verified": user.email_verified,
+    return {"id": user.id, "username": user.username,
             "is_admin": user.is_admin,
             "onboarding_complete": profile_payload(db, user.id)["onboarding_complete"]}

@@ -1,65 +1,25 @@
-# 선택 사항인 VS Code REST Client 요청 예제입니다. 실제 토큰을 이 파일에 저장해 커밋하지 마세요.
 @base = http://localhost:3104
 @token = REPLACE_WITH_LOGIN_TOKEN
-@noticeId = 1
 
-### 서버·DB 상태
-GET {{base}}/health
-
-### 회원가입 예시: 기본 메일은 로컬 파일에만 저장
+### 가입
 POST {{base}}/api/auth/register
 Content-Type: application/json
 
-{
-  "email": "student@example.com",
-  "password": "local-test-only-change-this"
-}
+{"username":"student01","password":"long-passphrase-123"}
 
-### 개발 메일에서 읽은 토큰으로 이메일 확인
-POST {{base}}/api/auth/verify-email
-Content-Type: application/json
-
-{"token":"REPLACE_WITH_EMAIL_VERIFICATION_TOKEN"}
-
-### 로그인: access_token은 커밋되는 파일이 아닌 개인 변수에 보관
+### 로그인
 POST {{base}}/api/auth/login
 Content-Type: application/json
 
-{
-  "email": "student@example.com",
-  "password": "local-test-only-change-this"
-}
+{"username":"student01","password":"long-passphrase-123"}
 
-### 관심 분야·활동 유형 사전
-GET {{base}}/api/interests
+### 현재 계정
+GET {{base}}/api/auth/me
+Authorization: Bearer {{token}}
 
-### 학적·관심사 저장
-PUT {{base}}/api/profile
+### 비밀번호 변경
+POST {{base}}/api/auth/change-password
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
-{
-  "department": "컴퓨터공학과",
-  "grade": 2,
-  "academic_status": "enrolled",
-  "interest_ids": ["ai_sw","hackathon"]
-}
-
-### 맞춤 추천
-GET {{base}}/api/notices/recommended?page=1&page_size=20
-Authorization: Bearer {{token}}
-
-### 신규 공지
-GET {{base}}/api/notices/new?days=7
-
-### API에서 실제 반환된 공지 ID로 찜하기
-POST {{base}}/api/bookmarks/{{noticeId}}
-Authorization: Bearer {{token}}
-
-### 월간 캘린더: 공지 일정이 있는 월로 변경
-GET {{base}}/api/calendar?month=2026-09
-Authorization: Bearer {{token}}
-
-### 로그아웃
-POST {{base}}/api/auth/logout
-Authorization: Bearer {{token}}
+{"current_password":"long-passphrase-123","new_password":"another-passphrase-123"}

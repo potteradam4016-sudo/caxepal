@@ -50,7 +50,6 @@ def optional_principal(
     hashed = digest_token(credentials.credentials)
     row = db.execute(select(AuthSession, User).join(User, User.id == AuthSession.user_id).where(
         AuthSession.token_hash == hashed, AuthSession.expires_at > now_ts(),
-        User.email_verified.is_(True)
     )).first()
     if row is None:
         raise APIError(401, "INVALID_SESSION", "로그인이 필요하거나 세션이 만료되었습니다.",
