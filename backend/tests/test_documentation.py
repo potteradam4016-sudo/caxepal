@@ -59,10 +59,8 @@ def test_environment_template_is_safe_and_not_private():
             values[name] = value
     assert values["SECRET_KEY"] == ""
     assert values["OPENAI_API_KEY"] == ""
-    assert values["SMTP_PASSWORD"] == ""
     assert values["CRAWL_ENABLED"] == "false"
     assert values["AUTO_CRAWL"] == "false"
-    assert values["MAIL_BACKEND"] == "file"
     assert values["AI_PROVIDER"] == "rules"
 
 

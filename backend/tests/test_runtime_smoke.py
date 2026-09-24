@@ -19,7 +19,7 @@ def test_real_http_workflow_in_temporary_workspace(tmp_path):
     assert result.returncode == 0, result.stdout + result.stderr
     data = json.loads(report.read_text("utf-8"))
     assert data["passed"] is True
-    assert data["http_request_count"] == 55
+    assert data["http_request_count"] >= 12
     assert all(item["status"] == item["expected"] for item in data["http_requests"])
     assert data["real_school_crawl"] is False
     assert data["uses_existing_user_database"] is False

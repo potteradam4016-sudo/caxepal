@@ -30,7 +30,7 @@ API 요청 처리 중 긴 크롤링을 실행하지 않습니다.
 | `app/schemas.py` | API 입력/출력 및 분석 결과 자료형·검증 |
 | `app/security.py` | Argon2id, 무작위 토큰, 인증 사용자·관리자 의존성 |
 | `app/middleware.py`, `app/errors.py` | 본문 크기·요청 제한·헤더·오류 |
-| `app/api/auth.py` | 계정·메일 확인·세션·복구 |
+| `app/api/auth.py` | 아이디 가입·로그인·세션·비밀번호 변경 |
 | `app/api/profile.py` | 관심사·본인 학적 |
 | `app/api/notices.py` | 공지·추천·검색·필터·출처 |
 | `app/api/bookmarks.py` | 찜과 월간 캘린더 |
@@ -41,7 +41,6 @@ API 요청 처리 중 긴 크롤링을 실행하지 않습니다.
 | `app/services/jobs.py`, `app/worker.py` | 작업 큐, 독점 lease, 재실행·자동 주기 |
 | `app/crawlers/parser.py`, `client.py` | CMS 선택자 및 허용 URL·robots·재시도 |
 | `app/reference.py` | 출처·관심사 사전 제안 |
-| `app/cli.py` | 초기화, 관리자, 수집, 메일 확인, 재분석, 정리 |
 | `migrations/` | 스키마 변경 이력 |
 | `tests/` | 임시 DB·합성 HTML 기반 회귀 시험 |
 
@@ -49,11 +48,10 @@ API 요청 처리 중 긴 크롤링을 실행하지 않습니다.
 
 | 테이블 | 내용 |
 | --- | --- |
-| users | 이메일, 비밀번호 해시, 이메일 확인 여부, 관리자 여부 |
+| users | 고유 아이디, 비밀번호 해시, 관리자 여부 |
 | profiles | 본인 학적·수정 버전 |
 | interests / profile_interests | 사전과 사용자 선택 |
 | auth_sessions | 로그인 토큰 해시·만료 |
-| auth_tokens | 이메일 확인/비밀번호 재설정 토큰 해시·만료 |
 | sources | 세 출처, 활성 상태, 마지막 성공 |
 | notices | 원문 ID·제목·텍스트·게시일·원문 URL·첨부 정보·hash |
 | notice_analyses | 구조화 JSON, 상태, 검수·마감 조회 필드 |
@@ -62,14 +60,13 @@ API 요청 처리 중 긴 크롤링을 실행하지 않습니다.
 | crawl_runs | 출처별 수집 실행, 건수와 오류 |
 | leases | worker·scheduler의 독점 처리 상태 |
 | rate_buckets | 공유 요청 제한 횟수 |
-| audit_logs | 메일 실패·수동 검수 등 안전한 운영 기록 |
 
 원문 공지는 `(source_code, external_id)` 유일 제약으로 중복을 막습니다.
-계정 삭제 시 프로필·관심 선택·세션·토큰·찜은 외래키 cascade로 삭제합니다.
+계정 삭제 시 프로필·관심 선택·세션·찜은 외래키 cascade로 삭제합니다.
 개인정보가 아닌 공지 원문을 계정과 함께 지우지 않습니다.
 epoch timestamp 열은 BIGINT입니다.
 
-`python -m app.cli init-db`는 Alembic `0001` 마이그레이션 후 출처/관심사만 추가합니다.
+`python -m app.cli init-db`는 Alembic `0002`까지 적용한 후 출처/관심사만 추가합니다.
 반복 실행해도 사용자·공지·기존 reference 설정을 초기화하지 않습니다.
 reference seed는 기존 행을 자동 수정하거나 삭제하지 않으므로 사전 변경 시 데이터 마이그레이션이 필요합니다.
 개발 API 시작 시 임의 `create_all()`로 스키마를 변경하지 않습니다.
@@ -79,7 +76,6 @@ reference seed는 기존 행을 자동 수정하거나 삭제하지 않으므로
 이 구현의 계정 원장은 자체 `users` 테이블입니다.
 로그인 응답에서만 원본 무작위 세션 토큰을 전달하며 DB에는 SHA-256 해시를 보관합니다.
 비밀번호에는 Argon2id를 사용합니다. 토큰 해시와 비밀번호 해시는 목적이 다릅니다.
-이메일 확인/재설정 토큰은 일회용 DB DELETE RETURNING으로 소비합니다.
 
 운영 세션은 서버 DB 조회로 확인하므로 폐기 후 바로 무효화됩니다.
 Supabase JWT, service-role API key, React에서 직접 DB 접근은 사용하지 않습니다.
@@ -114,11 +110,13 @@ Supabase JWT, service-role API key, React에서 직접 DB 접근은 사용하지
 
 ## 6. 안전한 기본값과 한계
 
-메일은 개발 파일 모드, 수집과 자동 수집은 비활성화, 외부 AI는 미사용이 기본입니다.
-운영 모드에서 개발 DB/메일이 조용히 사용되지 않도록 시작 시 거부합니다.
 회원 데이터는 API에서 본인 ID 조건을 강제합니다. 공개 테이블 직접 읽기 권한은 제공하지 않습니다.
 
 요청 제한은 DB 기반 고정 시간창 방식으로 MVP용입니다.
 분산 대규모 서비스의 전문 방어 체계나 완전한 DDoS 보호가 아닙니다.
 프록시 뒤의 실사용자 IP 설정, PostgreSQL 역할 최소화, 비밀 관리·백업·독립 보안 검토가 운영 전 필요합니다.
 백엔드 코드 제공을 운영 서비스 배포 완료와 혼동하지 않습니다.
+
+## 아이디 인증
+
+사용자 테이블은 고유 `username`과 Argon2id 비밀번호 해시를 저장합니다. 가입 즉시 로그인할 수 있으며 비밀번호 변경에는 로그인 세션과 현재 비밀번호가 필요합니다. 변경 후 모든 세션을 폐기합니다.

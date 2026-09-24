@@ -22,15 +22,7 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000"
     docs_enabled: bool = True
     session_hours: int = Field(default=24, ge=1, le=168)
-    mail_backend: Literal["file", "smtp"] = "file"
-    mail_from: str = "no-reply@example.com"
-    mail_directory: Path = BASE_DIR / "data/mail"
     frontend_url: str = "http://localhost:5173"
-    smtp_host: str = ""
-    smtp_port: int = Field(default=587, ge=1, le=65535)
-    smtp_username: str = ""
-    smtp_password: str = ""
-    smtp_tls: Literal["starttls", "ssl"] = "starttls"
     crawl_enabled: bool = False
     auto_crawl: bool = False
     crawl_interval_seconds: int = Field(default=10800, ge=3600)
@@ -68,19 +60,13 @@ class Settings(BaseSettings):
                 raise ValueError("Origins must not contain paths, queries, or fragments.")
         if self.ai_provider == "openai" and (not self.openai_api_key or not self.openai_model):
             raise ValueError("OPENAI_API_KEY and OPENAI_MODEL are required for AI_PROVIDER=openai.")
-        if self.mail_backend == "smtp" and not self.smtp_host:
-            raise ValueError("SMTP_HOST is required.")
         if self.app_env == "production":
-            if self.mail_backend != "smtp":
-                raise ValueError("Production requires real SMTP, not file mail.")
             if self.database_url.startswith("sqlite"):
                 raise ValueError("Production requires PostgreSQL; SQLite is for local validation.")
             if not self.frontend_url.startswith("https://"):
                 raise ValueError("Production FRONTEND_URL must use HTTPS.")
             if any(not x.startswith("https://") for x in self.origins):
                 raise ValueError("Production CORS origins must use HTTPS.")
-            if self.mail_from.endswith("@example.com"):
-                raise ValueError("Set the verified production sender MAIL_FROM.")
         return self
 
 @lru_cache

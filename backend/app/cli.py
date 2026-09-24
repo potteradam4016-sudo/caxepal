@@ -1,15 +1,13 @@
 import argparse
 import json
 import sys
-from email import policy
-from email.parser import BytesParser
 from pathlib import Path
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import delete, select
 from app.config import BASE_DIR, get_settings
 from app.db import make_engine, session_factory
-from app.models import AuthSession, AuthToken, CrawlJob, Notice, RateBucket, User, now_ts
+from app.models import AuthSession, CrawlJob, Notice, RateBucket, User, now_ts
 from app.reference import seed_reference
 from app.schemas import CrawlInput
 from app.services.analysis import analyze, apply_analysis
@@ -37,14 +35,13 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("init-db")
     admin = sub.add_parser("grant-admin")
-    admin.add_argument("--email", required=True)
+    admin.add_argument("--username", required=True)
     admin.add_argument("--revoke", action="store_true")
     crawl = sub.add_parser("crawl")
     crawl.add_argument("--source", choices=["all","SCNU_MAIN","SCNU_SW","SCNU_AI"], default="all")
     crawl.add_argument("--pages", type=int, default=1)
     crawl.add_argument("--max-notices", type=int, default=5)
     crawl.add_argument("--max-age-days", type=int, default=60)
-    sub.add_parser("mail")
     sub.add_parser("cleanup")
     export = sub.add_parser("export-openapi")
     export.add_argument("--output", default="docs/openapi.json")
@@ -57,17 +54,6 @@ def main():
     if args.command == "init-db":
         migrate(settings)
         print("DB 마이그레이션과 출처·관심사 사전 준비를 완료했습니다. 가짜 공지는 넣지 않았습니다.")
-        return
-    if args.command == "mail":
-        if settings.app_env == "production" or settings.mail_backend != "file":
-            parser.error("로컬 메일 조회는 개발용 파일 메일 모드에서만 가능합니다.")
-        paths = sorted(settings.mail_directory.glob("*.eml"), key=lambda p:p.stat().st_mtime)
-        if not paths:
-            print("아직 개발 메일이 없습니다. 먼저 가입하거나 확인 메일을 요청하세요.")
-            return
-        for path in paths[-5:]:
-            msg = BytesParser(policy=policy.default).parsebytes(path.read_bytes())
-            print(f"\n--- {path.name} ---\nTo: {msg['To']}\n{msg.get_body(preferencelist=('plain',)).get_content()}")
         return
     if args.command == "export-openapi":
         from app.factory import create_app
@@ -83,9 +69,9 @@ def main():
     try:
         if args.command == "grant-admin":
             with factory() as db:
-                user = db.scalar(select(User).where(User.email==args.email.strip().casefold()))
-                if not user or not user.email_verified:
-                    parser.error("관리자 권한을 부여하기 전에 가입과 이메일 확인을 마치세요.")
+                user = db.scalar(select(User).where(User.username==args.username.strip().casefold()))
+                if not user:
+                    parser.error("먼저 해당 아이디로 가입하세요.")
                 user.is_admin = not args.revoke
                 db.commit()
             print("관리자 권한을 변경했습니다. 새 비밀번호나 테스트 관리자는 생성하지 않았습니다.")
@@ -107,15 +93,10 @@ def main():
                     sys.exit(1)
         elif args.command == "cleanup":
             with factory() as db:
-                for model in (AuthSession, AuthToken, RateBucket):
+                for model in (AuthSession, RateBucket):
                     db.execute(delete(model).where(model.expires_at < now_ts()))
                 db.commit()
-            # Token-bearing development mail should not accumulate.
-            if settings.mail_backend == "file":
-                for path in settings.mail_directory.glob("*.eml"):
-                    if path.stat().st_mtime < now_ts() - 2*86400:
-                        path.unlink()
-            print("만료된 인증·요청 제한 기록과 오래된 개발 메일을 정리했습니다.")
+            print("만료된 세션·요청 제한 기록을 정리했습니다.")
         elif args.command == "reanalyze":
             if not 1 <= args.limit <= 1000:
                 parser.error("--limit은 1~1000 범위여야 합니다.")

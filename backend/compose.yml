@@ -1,4 +1,4 @@
-# APP_ENV=production에는 외부 PostgreSQL과 실제 SMTP 설정이 필요합니다.
+# APP_ENV=production에는 외부 PostgreSQL 설정이 필요합니다.
 # 첫 배포 전에 실행: docker compose run --rm api python -m app.cli init-db
 services:
   api:

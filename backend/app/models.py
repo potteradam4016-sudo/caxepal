@@ -15,9 +15,8 @@ def now_ts() -> int:
 class User(Base):
     __tablename__ = "users"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
-    email: Mapped[str] = mapped_column(String(320), unique=True)
+    username: Mapped[str] = mapped_column(String(32), unique=True)
     password_hash: Mapped[str] = mapped_column(String(512))
-    email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[int] = mapped_column(BigInteger, default=now_ts)
 
@@ -50,15 +49,6 @@ class AuthSession(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     expires_at: Mapped[int] = mapped_column(BigInteger, index=True)
     created_at: Mapped[int] = mapped_column(BigInteger, default=now_ts)
-
-class AuthToken(Base):
-    __tablename__ = "auth_tokens"
-    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    purpose: Mapped[str] = mapped_column(String(12))
-    expires_at: Mapped[int] = mapped_column(BigInteger, index=True)
-    created_at: Mapped[int] = mapped_column(BigInteger, default=now_ts)
-    __table_args__ = (CheckConstraint("purpose IN ('verify','reset')", name="purpose"),)
 
 class Source(Base):
     __tablename__ = "sources"

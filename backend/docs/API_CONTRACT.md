@@ -37,29 +37,19 @@ JWT가 아닙니다. Supabase Auth 토큰도 아닙니다.
 
 ## 2. 인증 API
 
-| HTTP 방식 | 경로 | 본문/기능 | 성공 |
+아이디는 영문 소문자로 시작하는 영문 소문자·숫자·밑줄 3~32자입니다. 입력은 양쪽 공백을 제거하고 소문자로 통일합니다. 비밀번호는 가입·변경 시 12~128자입니다.
+
+| 방식 | 경로 | 본문 | 성공 |
 | --- | --- | --- | --- |
-| POST | `/api/auth/register` | email, password(12~128자) | 202 |
-| POST | `/api/auth/resend-verification` | 이메일 `email` | 202 |
-| POST | `/api/auth/verify-email` | 확인 토큰 `token` | 200 |
-| POST | `/api/auth/login` | 이메일 `email`, 비밀번호 `password` | 200 |
-| GET | `/api/auth/me` | 현재 계정, 인증 필요 | 200 |
-| POST | `/api/auth/logout` | 현재 세션 폐기, 인증 필요 | 204 |
-| POST | `/api/auth/logout-all` | 본인 모든 세션 폐기, 인증 필요 | 204 |
-| POST | `/api/auth/forgot-password` | 이메일 `email` | 202 |
-| POST | `/api/auth/reset-password` | token, password(새 비밀번호) | 200 |
-| DELETE | `/api/auth/account` | password, 인증 필요; 본인 탈퇴 | 204 |
+| POST | `/api/auth/register` | `username`, `password` | 201 |
+| POST | `/api/auth/login` | `username`, `password` | 200 |
+| GET | `/api/auth/me` | Bearer 토큰 | 200 |
+| POST | `/api/auth/logout` | Bearer 토큰 | 204 |
+| POST | `/api/auth/logout-all` | Bearer 토큰 | 204 |
+| POST | `/api/auth/change-password` | Bearer 토큰, `current_password`, `new_password` | 200 |
+| DELETE | `/api/auth/account` | Bearer 토큰, `password` | 204 |
 
-가입·재발송·비밀번호 재설정 요청은 계정 존재 여부를 직접 드러내지 않는 접수 문구를 반환합니다.
-메일 실패도 동일 응답이며 운영 로그의 안전한 오류 종류를 통해 확인합니다.
-202는 실제 메일 배달 완료를 뜻하지 않습니다.
-이미 가입된 이메일로 register를 반복해도 기존 비밀번호를 덮어쓰지 않습니다.
-
-메일 확인 토큰은 24시간, 비밀번호 재설정 토큰은 30분이며 일회용입니다.
-확인 완료 시 같은 계정의 다른 확인 토큰도 폐기합니다.
-비밀번호 재설정 완료 시 기존 세션·작업 토큰을 모두 폐기합니다.
-
-로그인 응답 형태:
+중복 아이디는 409 `USERNAME_TAKEN`입니다. 비밀번호 변경은 현재 비밀번호를 다시 확인하고 모든 세션을 폐기합니다. 비밀번호를 잊은 계정에 대한 셀프 복구는 MVP에서 제공하지 않습니다. 계정 소유를 확인할 수 있는 별도 운영 절차가 확정될 때까지 새 계정을 사용하도록 안내합니다. 관리자도 임의의 비밀번호를 재설정할 수 없습니다.
 
 ```json
 {
@@ -68,22 +58,12 @@ JWT가 아닙니다. Supabase Auth 토큰도 아닙니다.
   "expires_at": 1789999999,
   "user": {
     "id": "<uuid>",
-    "email": "student@example.com",
-    "email_verified": true,
+    "username": "student01",
     "is_admin": false,
     "onboarding_complete": false
   }
 }
 ```
-
-위 토큰·타임스탬프는 형식 설명용이며 사용 가능한 자격증명이 아닙니다.
-이메일 확인은 학교 학생 인증과 구분합니다.
-비밀번호를 모르는 요청에는 일반적인 401을 반환하고, 올바른 비밀번호지만 이메일 확인 전인 경우 403 `EMAIL_NOT_VERIFIED`입니다.
-
-미래 프론트에 필요한 화면:
-`/verify-email#token=...`에서 fragment 토큰을 읽어 verify API로 POST하고 주소에서 토큰을 제거합니다.
-`/reset-password#token=...`에서는 새 비밀번호를 받아 reset API로 POST합니다.
-이 두 UI와 라우팅은 프론트 담당자의 작업입니다.
 
 ## 3. 관심사·프로필
 
@@ -292,7 +272,7 @@ worker lease가 실제 동시 수집을 제한합니다.
 | --- | --- |
 | 400 | 토큰·요청 확인; 확인 링크는 새로 발급 |
 | 401 | 인증 상태 제거 후 로그인 |
-| 403 | 미확인 이메일 또는 관리자 권한/수집 설정 확인 |
+| 403 | 관리자 권한 또는 수집 설정 확인 |
 | 404 | 없어진 공지·잘못된 경로 안내 |
 | 409 | 프로필/원문 재조회, 진행 중 작업 상태 조회 |
 | 413 | 입력 크기를 줄임 |
@@ -302,11 +282,11 @@ worker lease가 실제 동시 수집을 제한합니다.
 
 프록시나 TrustedHost/CORS에서 발생한 거부 응답은 JSON 계약이 아닐 수 있습니다.
 프론트는 HTTP 상태·Content-Type을 확인한 후 JSON을 읽고, 파싱 실패도 처리해야 합니다.
-비밀번호·확인 토큰·로그인 토큰을 오류 화면이나 수집 로그에 다시 출력하지 않습니다.
+비밀번호·로그인 토큰을 오류 화면이나 수집 로그에 다시 출력하지 않습니다.
 
 ## 9. 프론트 연결 검수 순서
 
-가입 → 메일 확인 → 로그인 → me → 관심사 조회 → 프로필 저장 → 추천/신규 →
+가입 → 로그인 → me → 관심사 조회 → 프로필 저장 → 추천/신규 →
 상세 → 찜 → 캘린더 → 프로필 수정 후 추천 재조회 → 로그아웃 순서로 검수합니다.
 
 신규 계정, 미완성 프로필, 빈 수집 목록, 일정 미정, 만료된 토큰, 429, 수집 실패의 화면 상태도 구현합니다.

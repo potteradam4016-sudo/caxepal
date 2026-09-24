@@ -29,7 +29,7 @@ def test_ambiguous_eligibility_is_not_a_hard_filter():
     assert "AMBIGUOUS_ELIGIBILITY" in warnings
 
 def test_ascii_keywords_do_not_match_inside_words():
-    data,_=extract_rules("MAIL 안내","normal message")
+    data,_=extract_rules("RAIL 안내","normal message")
     assert "ai_sw" not in data.field_ids
 
 def test_no_fabricated_unstated_year_or_mixed_schedule():
@@ -75,7 +75,7 @@ def test_unknown_eligibility_does_not_earn_match_points():
 def test_admin_is_not_self_assignable(client,user_factory,app):
     headers,ident=user_factory()
     assert client.get("/api/admin/crawl-jobs",headers=headers).status_code == 403
-    assert client.post("/api/auth/register",json={"email":"hack@example.com","password":PASSWORD,"is_admin":True}).status_code == 422
+    assert client.post("/api/auth/register",json={"username":"hack","password":PASSWORD,"is_admin":True}).status_code == 422
     with app.state.sessions() as db:
         db.get(User,ident).is_admin=True
         db.commit()
@@ -114,7 +114,7 @@ def test_request_size_limit(client,settings):
 
 def test_auth_throttle_persists_in_database(client,settings):
     settings.auth_limit_per_15_minutes=1
-    body={"email":"unknown@example.com","password":"wrong"}
+    body={"username":"unknown","password":"wrong"}
     assert client.post("/api/auth/login",json=body).status_code == 401
     r=client.post("/api/auth/login",json=body)
     assert r.status_code == 429 and int(r.headers["retry-after"]) > 0
@@ -122,9 +122,9 @@ def test_auth_throttle_persists_in_database(client,settings):
 def test_basic_auth_cannot_silently_be_anonymous(client):
     assert client.get("/api/notices",headers={"Authorization":"Basic abc"}).status_code == 401
 
-def test_production_rejects_development_mail_and_sqlite():
+def test_production_rejects_sqlite():
     with pytest.raises(ValidationError):
-        Settings(_env_file=None,secret_key="x"*40,app_env="production",mail_backend="file")
+        Settings(_env_file=None,secret_key="x"*40,app_env="production")
     with pytest.raises(ValidationError):
         Settings(_env_file=None,secret_key="x"*40,cors_origins="*")
 
@@ -158,17 +158,3 @@ def test_ai_summary_cannot_invent_freeform_benefit():
     data.summary_lines[1] = "활동: 참가자 전원에게 상금 100만원 지급"
     checked = validate_grounding(data, "교육 안내", body)
     assert checked.summary_lines[1] == "활동: 교육 안내"
-
-def test_mail_failure_keeps_generic_response_and_audit(client, app, monkeypatch):
-    from app.services import mail
-    def fail(*args, **kwargs):
-        raise RuntimeError("private-provider-error")
-    monkeypatch.setattr(mail, "send_action_mail", fail)
-    response = client.post("/api/auth/register", json={"email":"delivery@example.com","password":PASSWORD})
-    assert response.status_code == 202
-    assert "private-provider-error" not in response.text
-    with app.state.sessions() as db:
-        records = db.scalars(select(AuditLog).where(AuditLog.action=="mail_delivery_failed")).all()
-        assert len(records) == 1
-        assert records[0].details["error_type"] == "RuntimeError"
-        assert "private-provider-error" not in str(records[0].details)

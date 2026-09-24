@@ -48,13 +48,12 @@ def upgrade() -> None:
     )
     op.create_table('users',
     sa.Column('id', sa.String(length=36), nullable=False),
-    sa.Column('email', sa.String(length=320), nullable=False),
+    sa.Column('username', sa.String(length=32), nullable=False),
     sa.Column('password_hash', sa.String(length=512), nullable=False),
-    sa.Column('email_verified', sa.Boolean(), nullable=False),
     sa.Column('is_admin', sa.Boolean(), nullable=False),
     sa.Column('created_at', sa.BigInteger(), nullable=False),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_users')),
-    sa.UniqueConstraint('email', name=op.f('uq_users_email'))
+    sa.UniqueConstraint('username', name=op.f('uq_users_username'))
     )
     op.create_table('audit_logs',
     sa.Column('id', sa.Integer(), nullable=False),
@@ -77,20 +76,6 @@ def upgrade() -> None:
     with op.batch_alter_table('auth_sessions', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_auth_sessions_expires_at'), ['expires_at'], unique=False)
         batch_op.create_index(batch_op.f('ix_auth_sessions_user_id'), ['user_id'], unique=False)
-
-    op.create_table('auth_tokens',
-    sa.Column('token_hash', sa.String(length=64), nullable=False),
-    sa.Column('user_id', sa.String(length=36), nullable=False),
-    sa.Column('purpose', sa.String(length=12), nullable=False),
-    sa.Column('expires_at', sa.BigInteger(), nullable=False),
-    sa.Column('created_at', sa.BigInteger(), nullable=False),
-    sa.CheckConstraint("purpose IN ('verify','reset')", name=op.f('ck_auth_tokens_purpose')),
-    sa.ForeignKeyConstraint(['user_id'], ['users.id'], name=op.f('fk_auth_tokens_user_id_users'), ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('token_hash', name=op.f('pk_auth_tokens'))
-    )
-    with op.batch_alter_table('auth_tokens', schema=None) as batch_op:
-        batch_op.create_index(batch_op.f('ix_auth_tokens_expires_at'), ['expires_at'], unique=False)
-        batch_op.create_index(batch_op.f('ix_auth_tokens_user_id'), ['user_id'], unique=False)
 
     op.create_table('crawl_jobs',
     sa.Column('id', sa.String(length=36), nullable=False),
@@ -202,7 +187,7 @@ def upgrade() -> None:
     if op.get_bind().dialect.name == "postgresql":
         tables = [
             "interests", "leases", "rate_buckets", "sources", "users", "audit_logs",
-            "auth_sessions", "auth_tokens", "crawl_jobs", "notices",
+            "auth_sessions", "crawl_jobs", "notices",
             "profile_interests", "profiles", "bookmarks", "crawl_runs", "notice_analyses",
         ]
         for table in tables:
@@ -217,7 +202,7 @@ def upgrade() -> None:
             IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = role_name) THEN
               FOREACH table_name IN ARRAY ARRAY[
                 'interests','leases','rate_buckets','sources','users','audit_logs',
-                'auth_sessions','auth_tokens','crawl_jobs','notices',
+                'auth_sessions','crawl_jobs','notices',
                 'profile_interests','profiles','bookmarks','crawl_runs','notice_analyses'
               ] LOOP
                 EXECUTE format('REVOKE ALL ON TABLE %I FROM %I', table_name, role_name);
@@ -251,11 +236,6 @@ def downgrade() -> None:
         batch_op.drop_index(batch_op.f('ix_crawl_jobs_created_at'))
 
     op.drop_table('crawl_jobs')
-    with op.batch_alter_table('auth_tokens', schema=None) as batch_op:
-        batch_op.drop_index(batch_op.f('ix_auth_tokens_user_id'))
-        batch_op.drop_index(batch_op.f('ix_auth_tokens_expires_at'))
-
-    op.drop_table('auth_tokens')
     with op.batch_alter_table('auth_sessions', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_auth_sessions_user_id'))
         batch_op.drop_index(batch_op.f('ix_auth_sessions_expires_at'))

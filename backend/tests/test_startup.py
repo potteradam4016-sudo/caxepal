@@ -128,7 +128,7 @@ def test_settings_probe_does_not_print_secret_inputs(tmp_path, monkeypatch):
         monkeypatch.delenv(key, raising=False)
     with pytest.raises(subprocess.CalledProcessError) as error:
         launcher.load_settings(Path(sys.executable))
-    assert "백엔드 설정 오류" in error.value.stderr
+    assert "configuration:" in error.value.stderr
     assert secret not in error.value.stderr
     assert "input_value=" not in error.value.stderr
 
@@ -158,7 +158,7 @@ def test_fresh_db_creates_missing_parent_before_migration(settings, tmp_path):
     engine = create_engine(config.database_url)
     try:
         with engine.connect() as connection:
-            assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0001"
+            assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0002"
             assert connection.execute(text("SELECT count(*) FROM notices")).scalar_one() == 0
             assert connection.execute(text("SELECT count(*) FROM sources")).scalar_one() == 3
     finally:

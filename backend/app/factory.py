@@ -20,7 +20,7 @@ def create_app(settings: Settings) -> FastAPI:
         try:
             with engine.connect() as conn:
                 revision = conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-                if revision != "0001":
+                if revision != "0002":
                     raise RuntimeError("Database schema is not at the expected revision.")
         except Exception as exc:
             engine.dispose()

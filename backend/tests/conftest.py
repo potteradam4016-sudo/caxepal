@@ -1,8 +1,5 @@
 from datetime import date
-from email import policy
-from email.parser import BytesParser
 from pathlib import Path
-import re
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -29,7 +26,7 @@ def isolate_test_environment(monkeypatch):
 def settings(tmp_path):
     return Settings(_env_file=None, secret_key="test-secret-only-not-for-deployment-"*2,
         app_env="test", database_url=f"sqlite:///{tmp_path / 'test.sqlite3'}",
-        mail_directory=tmp_path/"mail", request_limit_per_minute=1000,
+        request_limit_per_minute=1000,
         auth_limit_per_15_minutes=100)
 
 @pytest.fixture
@@ -44,22 +41,11 @@ def client(app):
     with TestClient(app) as c:
         yield c
 
-def latest_token(settings, email, subject=None):
-    files = sorted(settings.mail_directory.glob("*.eml"), key=lambda p:p.stat().st_mtime_ns, reverse=True)
-    for file in files:
-        mail = BytesParser(policy=policy.default).parsebytes(file.read_bytes())
-        if mail["To"] == email and (subject is None or subject in mail["Subject"]):
-            content = mail.get_body(preferencelist=("plain",)).get_content()
-            return re.search(r"token=([A-Za-z0-9_-]+)", content)[1]
-    raise AssertionError("Expected development mail")
-
 @pytest.fixture
-def user_factory(client, settings):
-    def create(email="alice@example.com", with_profile=True):
-        assert client.post("/api/auth/register", json={"email":email,"password":PASSWORD}).status_code == 202
-        token = latest_token(settings, email)
-        assert client.post("/api/auth/verify-email", json={"token":token}).status_code == 200
-        login = client.post("/api/auth/login", json={"email":email,"password":PASSWORD})
+def user_factory(client):
+    def create(username="alice", with_profile=True):
+        assert client.post("/api/auth/register", json={"username":username,"password":PASSWORD}).status_code == 201
+        login = client.post("/api/auth/login", json={"username":username,"password":PASSWORD})
         assert login.status_code == 200, login.text
         headers = {"Authorization":"Bearer "+login.json()["access_token"]}
         if with_profile:

@@ -1,6 +1,6 @@
 # GitHub에 올리는 방법
 
-## 1. 이번 ZIP에서 복사할 것은 backend 하나입니다
+## 1. 백엔드만 별도 저장소에 올리는 경우
 
 ```text
 기존 팀 저장소/
@@ -21,7 +21,7 @@
     └── START.cmd
 ```
 
-ZIP 최상위가 이미 `backend/`입니다. 기존 `backend` 안에 또 `backend`를 만들지 않습니다.
+이번 통합 ZIP의 최상위에는 `frontend/`와 `backend/`가 나란히 있습니다. 팀 통합 저장소에서는 `backend/`를 기존 `backend/` 위치에 복사합니다. 백엔드 전용 저장소라면 `backend/` **안의 내용**을 그 저장소 최상위에 복사합니다. `backend/backend/`로 두 번 중첩하지 않습니다.
 기존 저장소의 백엔드는 안내용 README뿐이었으므로 해당 README를 새 README로 바꾸고 나머지 파일을 추가하는 구조입니다.
 
 이후 팀원이 backend 코드를 추가했다면 무조건 폴더를 덮어쓰지 말고 차이를 비교합니다.
@@ -52,8 +52,7 @@ git switch -c feature/backend-implementation
 
 이미 `feature/backend-setup` 등 본인 브랜치가 있으면 그 브랜치를 사용해도 됩니다.
 현재 작업 변경이 있는 상태에서 무리하게 `dev`로 전환하지 말고 먼저 본인 브랜치에서 작업을 보존합니다.
-아래 초기 커밋 예시는 아직 백엔드를 한 번도 커밋하지 않은 경우입니다.
-이전에 올린 백엔드를 갱신하는 경우에는 `docs/COMMIT_GUIDE.md`의 수정 커밋을 사용합니다.
+아래 예시는 통합 저장소의 `backend/`만 커밋하는 경우입니다. 실제 변경 파일과 메시지 본문이 맞는지 확인한 뒤 사용합니다.
 
 ```bash
 git status --short
@@ -61,8 +60,19 @@ git add backend
 git diff --cached --stat
 git diff --cached --name-only
 git diff --cached
-git commit -F backend/docs/COMMIT_INITIAL.txt
-git push -u origin feature/backend-implementation
+git commit -F backend/docs/COMMIT_USERNAME_API.txt
+git push -u origin HEAD
+```
+
+백엔드 전용 저장소의 최상위에 파일을 복사했다면 경로가 다릅니다.
+
+```bash
+git status --short
+git add .
+git diff --cached --name-only
+git diff --cached
+git commit -F docs/COMMIT_USERNAME_API.txt
+git push -u origin HEAD
 ```
 
 GitHub에서 **base: dev / compare: feature/backend-implementation**인 Pull Request를 만듭니다.
@@ -72,11 +82,8 @@ main에는 곧바로 병합하지 않습니다. 권한 있는 팀원이 검토�
 
 | Git에 올림 | 절대 올리지 않음 |
 | --- | --- |
-| Python 소스, migrations, tests, 합성 fixtures | `.env`, SMTP 비밀번호, API 키, DB 연결 비밀번호 |
 | requirements, Dockerfile, compose | `.venv/`, `__pycache__/`, 테스트 캐시 |
-| `.env.example`, `.gitignore` | `data/`, SQLite DB, 실제 개발 메일 `.eml` |
 | Markdown 안내, OpenAPI 명세 | 실제 사용자 명단, 로그인 토큰, 개인 정보 로그 |
-| 추천 정책 제안 JSON | 학교의 비공개 허가 메일 전문, 서버 개인 키 |
 
 출력 명세 `docs/openapi.json`에는 비밀키·계정·수집한 실제 공지를 넣지 않았습니다.
 합성 HTML fixture는 테스트 전용이라고 표시되어 있으며 서비스 데이터에 자동 등록되지 않습니다.
