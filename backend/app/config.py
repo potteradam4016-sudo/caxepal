@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = Field(default=3104, ge=1, le=65535)
     allowed_hosts: str = "localhost,127.0.0.1,testserver"
-    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000"
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     docs_enabled: bool = True
     session_hours: int = Field(default=24, ge=1, le=168)
     frontend_url: str = "http://localhost:5173"
