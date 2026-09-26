@@ -85,7 +85,12 @@ def main():
             report = {"passed": True, "http_request_count": len(checks), "http_requests": checks,
                       "real_school_crawl": False, "uses_existing_user_database": False}
         finally:
-            server.terminate()
+            if os.name == "nt" and server.poll() is None:
+                # The Windows venv launcher can own a child holding the SQLite file.
+                subprocess.run(["taskkill", "/PID", str(server.pid), "/T", "/F"],
+                               capture_output=True, timeout=10, check=False)
+            else:
+                server.terminate()
             try:
                 server.wait(timeout=10)
             except subprocess.TimeoutExpired:

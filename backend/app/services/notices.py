@@ -42,7 +42,8 @@ def filtered_query(source=None, q=None, category=None, include_closed=True,
     if q:
         stmt = stmt.where(Notice.search_text.contains(q, autoescape=True))
     if category:
-        stmt = stmt.where(NoticeAnalysis.category == category)
+        categories = [category] if isinstance(category, str) else category
+        stmt = stmt.where(NoticeAnalysis.category.in_(categories))
     if not include_closed:
         stmt = stmt.where((NoticeAnalysis.deadline_at.is_(None)) | (NoticeAnalysis.deadline_at >= now))
     if after:

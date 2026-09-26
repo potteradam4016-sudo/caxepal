@@ -1,29 +1,21 @@
-import { useCallback, useEffect, useState } from 'react'
-import type { Notice, NoticeFilters } from '../types'
+import { useCallback } from 'react'
+import { api } from '../services/api'
+import { ApiError } from '../services/http'
+import { useAuth } from '../context/AuthContext'
+import { useApiResource } from './useApiResource'
+import type { NoticeFilters } from '../types'
 
-export function useNotices(loader: (filters: NoticeFilters) => Promise<Notice[]>, filters: NoticeFilters, revision = 0) {
-  const [notices, setNotices] = useState<Notice[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
-  const [requestVersion, setRequestVersion] = useState(0)
-
-  const retry = useCallback(() => setRequestVersion((value) => value + 1), [])
-
-  useEffect(() => {
-    let active = true
-    void Promise.resolve()
-      .then(() => {
-        if (active) {
-          setLoading(true)
-          setError(false)
-        }
-        return loader(filters)
-      })
-      .then((result) => { if (active) setNotices(result) })
-      .catch(() => { if (active) setError(true) })
-      .finally(() => { if (active) setLoading(false) })
-    return () => { active = false }
-  }, [loader, filters, revision, requestVersion])
-
-  return { notices, loading, error, retry }
+export function useNotices(kind: 'recommended' | 'new', filters: NoticeFilters, page: number) {
+  const { user, reloadProfile } = useAuth()
+  const version = user?.profileVersion ?? 0
+  const loader = useCallback(async (signal: AbortSignal) => {
+    // Include the profile version in the request lifecycle so edits invalidate recommendation results.
+    void version
+    try { return await api.list(kind, filters, page, signal) }
+    catch (error) {
+      if (error instanceof ApiError && error.code === 'PROFILE_INCOMPLETE') await reloadProfile()
+      throw error
+    }
+  }, [kind, filters, page, version, reloadProfile])
+  return useApiResource(loader)
 }

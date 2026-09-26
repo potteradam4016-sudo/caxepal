@@ -25,7 +25,7 @@ def closing_cutoff(days):
 def list_notices(
     source: SourceCode | None = None,
     q: str | None = Query(default=None, max_length=100),
-    category: Category | None = None,
+    category: list[Category] | None = Query(default=None),
     days: int | None = Query(default=None, ge=1, le=365),
     closing_days: int | None = Query(default=None, ge=0, le=90),
     include_closed: bool = True,
@@ -43,7 +43,7 @@ def list_notices(
 def recommended(
     request: Request,
     source: SourceCode | None = None,
-    category: Category | None = None,
+    category: list[Category] | None = Query(default=None),
     q: str | None = Query(default=None, max_length=100),
     closing_days: int | None = Query(default=None, ge=0, le=90),
     min_score: int | None = Query(default=None, ge=0, le=100),
