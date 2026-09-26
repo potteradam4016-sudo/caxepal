@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from './AuthContext'
 
 function UserBoundAppProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
-  const stateKey = user?.username ?? 'guest'
+  const stateKey = user?.id ?? 'guest'
   return <AppProvider key={stateKey}>{children}</AppProvider>
 }
 

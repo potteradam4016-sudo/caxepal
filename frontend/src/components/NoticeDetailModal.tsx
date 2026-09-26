@@ -1,96 +1,51 @@
-import { useEffect, useState } from 'react'
+import { useCallback } from 'react'
 import { useApp } from '../context/AppContext'
-import { mockNoticeService } from '../services/mockNoticeService'
-import type { Notice } from '../types'
-import { formatLongDate } from '../utils/format'
+import { useApiResource } from '../hooks/useApiResource'
+import { api } from '../services/api'
+import { ApiError, errorMessage } from '../services/http'
 import { Modal } from './Modal'
 import { ViewState } from './ViewState'
 
-export function NoticeDetailModal({ noticeId, onClose }: { noticeId: string; onClose: () => void }) {
-  const { favorites, favoritePending, toggleFavorite } = useApp()
-  const [notice, setNotice] = useState<Notice | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    let active = true
-    void Promise.resolve()
-      .then(() => {
-        if (active) {
-          setLoading(true)
-          setFailed(false)
-        }
-        return mockNoticeService.getNotice(noticeId)
-      })
-      .then((result) => {
-        if (active) setNotice(result)
-      })
-      .catch(() => {
-        if (active) setFailed(true)
-      })
-      .finally(() => {
-        if (active) setLoading(false)
-      })
-    return () => { active = false }
-  }, [noticeId])
-
-  return (
-    <Modal title={notice?.title ?? '공지 상세'} onClose={onClose} size="wide">
-      {loading && <ViewState state="loading" />}
-      {failed && <ViewState state="error" />}
-      {!loading && !failed && !notice && <ViewState state="empty" message="요청한 공지를 찾을 수 없습니다." />}
-      {!loading && notice && (
-        <div className="detail-content">
-          <div className="detail-meta">
-            <span className="notice-source">{notice.source}</span>
-            <div className="badges">
-              {notice.recommendationScore !== null && <span className="badge badge--score">추천도 {notice.recommendationScore}%</span>}
-              {notice.isDeadlineSoon && <span className="badge badge--deadline">마감 임박</span>}
-            </div>
-          </div>
-          <div className="detail-grid">
-            <section><b>대상</b><p>{notice.target}</p></section>
-            <section><b>활동</b><p>{notice.activity}</p></section>
-            <section><b>신청 일정</b><p>{formatLongDate(notice.schedule.applicationStart)} ~ {formatLongDate(notice.schedule.applicationEnd)}</p></section>
-            <section><b>행사 일정</b><p>{formatLongDate(notice.schedule.eventStart)} ~ {formatLongDate(notice.schedule.eventEnd)}</p></section>
-            <section><b>상금</b><p>{benefitLabel(notice)}</p></section>
-            <section><b>마일리지</b><p>{mileageLabel(notice)}</p></section>
-          </div>
-          {notice.recommendationReason && (
-            <section className="detail-reason"><b>추천 이유</b><p>{notice.recommendationReason}</p></section>
-          )}
-          <p className="detail-note">원문에 없는 혜택·금액·날짜는 추정하지 않습니다.</p>
-          <div className="modal-actions">
-            {notice.originalUrl ? (
-              <a className="button button--primary" href={notice.originalUrl} target="_blank" rel="noreferrer">원문 보기</a>
-            ) : (
-              <button className="button button--primary" type="button" disabled title="목 데이터에는 원문 URL이 없습니다">원문 링크 준비 중</button>
-            )}
-            <button
-              className={`button button--favorite ${favorites.has(notice.id) ? 'button--favorite-active' : ''}`}
-              type="button"
-              aria-pressed={favorites.has(notice.id)}
-              disabled={favoritePending.has(notice.id)}
-              onClick={() => void toggleFavorite(notice.id)}
-            >
-              {favorites.has(notice.id) ? '♥ 찜 해제' : '♡ 찜하기'}
-            </button>
-          </div>
+export function safeLink(value: string | null) {
+  if (!value) return undefined
+  try { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) ? url.href : undefined } catch { return undefined }
+}
+export function NoticeDetailModal({ noticeId, onClose }: { noticeId: number; onClose: () => void }) {
+  const { favorites, favoritePending, favoritesLoading, favoritesError, toggleFavorite, profileRevision } = useApp()
+  const loader = useCallback((signal: AbortSignal) => {
+    void profileRevision
+    if (!Number.isSafeInteger(noticeId) || noticeId < 1) return Promise.reject(new ApiError(404, 'NOTICE_NOT_FOUND', '공지를 찾을 수 없습니다.'))
+    return api.detail(noticeId, signal)
+  }, [noticeId, profileRevision])
+  const { data: notice, loading, error, retry } = useApiResource(loader)
+  return <Modal title={notice?.title ?? '공지 상세'} onClose={onClose} size="wide">
+    {loading ? <ViewState state="loading" /> : error ? <ViewState state={error instanceof ApiError && error.status === 404 ? 'empty' : 'error'} message={errorMessage(error)} onRetry={retry} /> : notice &&
+      <div className="detail-content">
+        <div className="detail-meta"><span className="notice-source">{notice.source}</span><div className="badges">
+          {notice.recommendation && <span className="badge badge--score">추천도 {notice.recommendation.score}%</span>}
+          <span className="badge">{notice.deadlineLabel}</span>
+        </div></div>
+        <div className="notice-summary">{notice.summary.map((line, index) => <p key={index}>{line}</p>)}</div>
+        <div className="detail-grid">
+          <section><b>대상</b><p>{notice.target ?? '미기재'}</p></section>
+          <section><b>신청 방법</b><p>{notice.applicationMethod ?? '미기재'}</p></section>
+          <section><b>상금</b><p>{notice.prize.status === 'none' ? '없음' : notice.prize.status === 'not_stated' ? '미기재' : notice.prize.description ?? '있음'}</p></section>
+          <section><b>마일리지</b>{notice.mileages.length ? notice.mileages.map((item, index) =>
+            <p key={index}>{item.system}: {item.points_text ?? '점수 미기재'} ({item.condition ?? '조건 미기재'})</p>) : <p>미기재</p>}</section>
         </div>
-      )}
-    </Modal>
-  )
-}
-
-function benefitLabel(notice: Notice) {
-  if (notice.benefit.prize.state === 'present') return notice.benefit.prize.detail ?? '있음 · 세부 내용은 원문 확인'
-  if (notice.benefit.prize.state === 'absent') return '없음'
-  return '미기재'
-}
-
-function mileageLabel(notice: Notice) {
-  if (!notice.benefit.mileage.length) return '미기재'
-  return notice.benefit.mileage
-    .map((item) => `${item.system}: ${item.points === null ? '점수 미기재' : `${item.points}점`} (${item.condition ?? '조건 미기재'})`)
-    .join(' · ')
+        <section><h3>신청·행사 일정</h3>{notice.schedules.length ? notice.schedules.map((schedule, index) =>
+          <p key={index}><b>{schedule.kind === 'application' ? '신청' : '행사'} · {schedule.label}</b><br />
+            {schedule.start_date ?? '시작일 미정'} {schedule.start_time ?? ''} ~ {schedule.end_date ?? '종료일 미정'} {schedule.end_time ?? ''}</p>) : <p>일정 미정</p>}</section>
+        {notice.recommendation && <section className="detail-reason"><h3>추천 이유</h3>{notice.recommendation.reasons.map((reason, index) => <p key={index}>{reason}</p>)}</section>}
+        <section><h3>공지 내용</h3><p className="notice-body">{notice.body}</p></section>
+        {!!notice.attachments.length && <section><h3>첨부파일</h3><ul>{notice.attachments.map((item, index) =>
+          <li key={index}>{safeLink(item.url) ? <a href={safeLink(item.url)} target="_blank" rel="noreferrer">{item.name}</a> : item.name}</li>)}</ul></section>}
+        <div className="modal-actions">
+          {safeLink(notice.originalUrl) && <a className="button button--primary" href={safeLink(notice.originalUrl)} target="_blank" rel="noreferrer">원문 보기</a>}
+          <button className="button button--favorite" type="button" aria-pressed={favorites.has(notice.id)}
+            disabled={favoritesLoading || Boolean(favoritesError) || favoritePending.has(notice.id)} onClick={() => void toggleFavorite(notice.id)}>
+            {favorites.has(notice.id) ? '♥ 찜 해제' : '♡ 찜하기'}</button>
+        </div>
+      </div>}
+  </Modal>
 }

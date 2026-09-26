@@ -1,90 +1,30 @@
-export const NOTICE_SOURCES = [
-  '순천대학교 대표 공지',
-  'SW중심대학사업단',
-  'AI인재양성부트캠프사업단',
-] as const
-
-export const NOTICE_CATEGORIES = ['장학/지원', '대외활동', '교육/특강', '프로젝트', '취업'] as const
-
-export type NoticeSource = (typeof NOTICE_SOURCES)[number]
-export type NoticeCategory = (typeof NOTICE_CATEGORIES)[number]
-export type BenefitState = 'present' | 'absent' | 'unspecified'
-export type AsyncState = 'idle' | 'loading' | 'success' | 'empty' | 'error'
-
-export interface NoticeSchedule {
-  applicationStart: string | null
-  applicationEnd: string | null
-  eventStart: string | null
-  eventEnd: string | null
+import type { AcademicStatus, Category, NoticeDetailDto, RecommendationDto, ScheduleDto, SourceCode } from './services/contracts'
+export const CATEGORY_LABELS: Record<Category, string> = {
+  contest: '공모전·대회', education: '교육·특강', scholarship: '장학·지원', career: '취업',
+  startup: '창업', overseas: '해외', volunteer: '봉사', other: '기타',
 }
-
-export interface Benefit {
-  prize: { state: BenefitState; detail?: string }
-  mileage: Array<{ system: string; points: number | null; condition: string | null }>
-  other: string[]
-}
-
-export interface Notice {
-  id: string
-  title: string
-  source: NoticeSource
-  publishedAt: string
-  target: string
-  activity: string
-  categories: NoticeCategory[]
-  keywords: string[]
-  schedule: NoticeSchedule
-  benefit: Benefit
-  recommendationScore: number | null
-  recommendationReason: string | null
-  isDeadlineSoon: boolean
-  isRecommended: boolean
-  originalUrl: string | null
-}
-
-export interface Profile {
-  department: string
-  grade: '1학년' | '2학년' | '3학년' | '4학년' | '5학년 이상'
-  enrollmentStatus: '재학' | '휴학' | '기타'
-  interests: string[]
-  activityTypes: string[]
-}
-
-export interface AcademicProfile {
-  department: string
-  grade: Profile['grade']
-  enrollmentStatus: Profile['enrollmentStatus']
-}
-
+export const NOTICE_CATEGORIES = Object.keys(CATEGORY_LABELS) as Category[]
+export const STATUS_LABELS: Record<AcademicStatus, string> = { enrolled: '재학', on_leave: '휴학', graduating: '졸업예정', graduated: '졸업' }
+export type NoticeCategory = Category
+export type NoticeSource = SourceCode
+export interface AcademicProfile { department: string; grade: number; enrollmentStatus: AcademicStatus }
+export interface Profile extends AcademicProfile { interests: string[]; activityTypes: string[]; version: number }
 export interface AuthUser {
-  username: string
-  onboardingCompleted: boolean
+  id: string; username: string; onboardingCompleted: boolean; profileVersion: number
   academicDraft: AcademicProfile | null
   preferenceDraft: Pick<Profile, 'interests' | 'activityTypes'>
   profile: Profile | null
 }
-
-export interface NoticeFilters {
-  query: string
-  categories: NoticeCategory[]
-  source?: NoticeSource | 'all'
-  deadlineSoon?: boolean
+export interface Notice {
+  id: number; title: string; source: string; sourceCode: SourceCode; publishedAt: string
+  category: Category; summary: string[]; deadlineLabel: string; isClosed: boolean; isDeadlineSoon: boolean
+  isBookmarked: boolean; needsReview: boolean; recommendation: RecommendationDto | null; originalUrl: string
 }
-
-export type CalendarEventType = 'application' | 'activity'
-export type CalendarEventKind = 'start' | 'end'
-
-export interface CalendarEvent {
-  id: string
-  noticeId: string
-  title: string
-  date: string
-  type: CalendarEventType
-  kind: CalendarEventKind
-  label: string
+export interface NoticeDetail extends Notice {
+  body: string; target: string | null; applicationMethod: string | null; schedules: ScheduleDto[]
+  prize: NoticeDetailDto['analysis']['data']['prize']
+  mileages: NoticeDetailDto['analysis']['data']['mileages']
+  attachments: NoticeDetailDto['attachments']
 }
-
-export interface FavoriteSchedules {
-  events: CalendarEvent[]
-  undated: Notice[]
-}
+export interface NoticeFilters { query: string; categories: Category[]; source?: SourceCode | 'all'; deadlineSoon?: boolean }
+export interface NoticePage { items: Notice[]; total: number; page: number; pageSize: number; profileVersion: number | null }
