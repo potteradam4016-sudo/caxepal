@@ -25,11 +25,15 @@ export function NoticeDetailModal({ noticeId, onClose }: { noticeId: number; onC
           {notice.recommendation && <span className="badge badge--score">추천도 {notice.recommendation.score}%</span>}
           <span className="badge">{notice.deadlineLabel}</span>
         </div></div>
+        {notice.analysisStatus === 'failed' ? <p className="analysis-notice" role="status">자동 분석에 실패했습니다. 신청 전 원문에서 정보를 확인해 주세요.</p>
+          : notice.analysisStatus !== 'reviewed' && <p className="analysis-notice" role="status">자동 추출한 정보입니다. 신청 전 원문에서 확인해 주세요.</p>}
         <div className="notice-summary">{notice.summary.map((line, index) => <p key={index}>{line}</p>)}</div>
         <div className="detail-grid">
-          <section><b>대상</b><p>{notice.target ?? '미기재'}</p></section>
+          <section><b>대상</b><p>{notice.target ?? '미기재'}</p>
+            {notice.recruitmentText && <div className="detail-subfield"><b>모집인원</b><p>{notice.recruitmentText}</p></div>}
+          </section>
           <section><b>신청 방법</b><p>{notice.applicationMethod ?? '미기재'}</p></section>
-          <section><b>상금</b><p>{notice.prize.status === 'none' ? '없음' : notice.prize.status === 'not_stated' ? '미기재' : notice.prize.description ?? '있음'}</p></section>
+          <section><b>상금</b><p className="detail-prize">{notice.prize.status === 'none' ? '없음' : notice.prize.status === 'not_stated' ? '미기재' : notice.prize.description ?? '있음'}</p></section>
           <section><b>마일리지</b>{notice.mileages.length ? notice.mileages.map((item, index) =>
             <p key={index}>{item.system}: {item.points_text ?? '점수 미기재'} ({item.condition ?? '조건 미기재'})</p>) : <p>미기재</p>}</section>
         </div>

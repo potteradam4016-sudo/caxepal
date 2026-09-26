@@ -47,6 +47,7 @@ def recommended(
     q: str | None = Query(default=None, max_length=100),
     closing_days: int | None = Query(default=None, ge=0, le=90),
     min_score: int | None = Query(default=None, ge=0, le=100),
+    analysis_success_only: bool = False,
     page: int = Query(default=1, ge=1, le=100000),
     page_size: int = Query(default=20, ge=1, le=100),
     principal=Depends(current_principal), db=Depends(get_db),
@@ -57,7 +58,8 @@ def recommended(
     policy = request.app.state.policy
     threshold = min_score if min_score is not None else policy["default_min_score"]
     query = filtered_query(source, q, category, include_closed=False,
-        deadline_before=closing_cutoff(closing_days) if closing_days is not None else None)
+        deadline_before=closing_cutoff(closing_days) if closing_days is not None else None,
+        analysis_success_only=analysis_success_only)
     bookmarks = bookmarked_ids(db, principal.user.id)
     items = []
     # Intentionally score ALL candidates before pagination. No silent first-N truncation.

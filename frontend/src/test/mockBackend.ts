@@ -31,6 +31,8 @@ export function mockBackend() {
   addUser('alice'); addUser('bob')
   const notices = Array.from({ length: 23 }, (_, index) => notice(index + 1))
   const calendars = new Map<string, CalendarDto>()
+  const detailAnalysis = new Map<number, { provider?: string; status: string; applicationMethod: string | null;
+    recruitmentText?: string | null; prizeDescription?: string | null }>()
   const errors = new Map<string, Response>()
   const fetcher = vi.fn(async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = new URL(String(input))
@@ -81,14 +83,21 @@ export function mockBackend() {
     if (/^\/notices\/\d+$/.test(path)) {
       const item = notices.find((value) => value.id === Number(path.split('/').pop()))
       if (!item) return failure(404, 'NOTICE_NOT_FOUND', '공지를 찾을 수 없습니다.')
+      const analysis = detailAnalysis.get(item.id)
       return json({ ...item, is_bookmarked: user.favorites.has(item.id), body_text: '시험 본문', attachments: [{ name: '자료', url: null }],
-        content_hash: '', image_only: false, fetched_at: 1, analysis: { provider: 'rules', status: 'reviewed', warnings: [], analyzed_at: 1, data: {
-          target_text: null, application_method: null, schedules: [], prize: { status: 'not_stated', description: null, evidence: null },
+        content_hash: '', image_only: false, fetched_at: 1, analysis: { provider: analysis?.provider ?? 'rules', status: analysis?.status ?? 'reviewed', warnings: [], analyzed_at: 1, data: {
+          target_text: null, recruitment_text: analysis?.recruitmentText ?? null,
+          application_method: analysis?.applicationMethod ?? null, schedules: [],
+          prize: analysis?.prizeDescription ? { status: 'present', description: analysis.prizeDescription, evidence: analysis.prizeDescription }
+            : { status: 'not_stated', description: null, evidence: null },
           mileages: [{ system: '마일리지', points_text: '최대 10~20점', condition: null, evidence: '시험' }] } } })
     }
     const categories = url.searchParams.getAll('category')
     const query = url.searchParams.get('q') ?? ''
+    const successOnly = url.searchParams.get('analysis_success_only') === 'true'
     const all = notices.filter((item) => (path !== '/bookmarks' || user.favorites.has(item.id)) &&
+      (!successOnly || (detailAnalysis.get(item.id)?.provider === 'openai' &&
+        ['analyzed', 'needs_review'].includes(detailAnalysis.get(item.id)?.status ?? ''))) &&
       (!categories.length || categories.includes(item.category)) && item.title.includes(query))
     const page = Number(url.searchParams.get('page') ?? 1)
     const size = Number(url.searchParams.get('page_size') ?? 20)
@@ -96,6 +105,6 @@ export function mockBackend() {
       total: all.length, page, page_size: size, profile_version: user.profile.version })
   })
   vi.stubGlobal('fetch', fetcher)
-  return { users, notices, calendars, errors, fetcher, addUser,
+  return { users, notices, calendars, detailAnalysis, errors, fetcher, addUser,
     authenticate(name = 'alice') { session.save({ token: `token-${name}`, expiresAt: Date.now() / 1000 + 3600 }) } }
 }

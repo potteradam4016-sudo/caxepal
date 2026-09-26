@@ -26,13 +26,17 @@ export function NoticeListPage({ kind }: { kind: 'recommended' | 'new' }) {
   const { data, loading, error, retry } = useNotices(kind, stableFilters, page)
   const recommended = kind === 'recommended'
   const update = (next: Partial<NoticeFilters>) => { setFilters((current) => ({ ...current, ...next })); setPage(1) }
-  const reset = () => { setQuery(''); update({ query: '', categories: [], source: 'all', deadlineSoon: false }) }
+  const reset = () => { setQuery(''); update({ query: '', categories: [], source: 'all', deadlineSoon: false, analysisSuccessOnly: false }) }
   const toggle = (category: NoticeCategory) => update({ categories: filters.categories.includes(category) ? filters.categories.filter((item) => item !== category) : [...filters.categories, category] })
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / 20))
   return <div className="page">
     <header className="page-header"><div><span className="eyebrow">{recommended ? 'FOR YOU' : 'RECENTLY ADDED'}</span>
       <h1>{recommended ? '추천 공지' : '신규 공지'}</h1><p>{recommended ? '학적·관심 분야·활동 유형을 바탕으로 추천해요.' : '원문 등록일 기준 최신 공지를 확인하세요.'}</p></div>
-      {recommended && <button className="button button--secondary" onClick={overlay.openProfile}>관심사 변경</button>}
+      {recommended && <div className="page-header__actions">
+        <button className={`button button--secondary analysis-filter-button ${filters.analysisSuccessOnly ? 'analysis-filter-button--active' : ''}`}
+          aria-pressed={Boolean(filters.analysisSuccessOnly)} onClick={() => update({ analysisSuccessOnly: !filters.analysisSuccessOnly })}>AI 분석 성공만</button>
+        <button className="button button--secondary" onClick={overlay.openProfile}>관심사 변경</button>
+      </div>}
     </header>
     <div className="toolbar toolbar--split">
       <label className="search-field"><span className="sr-only">{recommended ? '추천 공지 검색' : '신규 공지 검색'}</span>

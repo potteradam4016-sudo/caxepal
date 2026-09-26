@@ -31,7 +31,7 @@ export interface ScheduleDto {
 export interface NoticeDetailDto extends NoticeCardDto {
   body_text: string; attachments: { name: string; url: string | null }[]; content_hash: string; image_only: boolean; fetched_at: number
   analysis: { provider: string; status: string; warnings: string[]; analyzed_at: number; data: {
-    target_text: string | null; summary_lines: string[]; schedules: ScheduleDto[]; application_method: string | null
+    target_text: string | null; recruitment_text: string | null; summary_lines: string[]; schedules: ScheduleDto[]; application_method: string | null
     prize: { status: 'present' | 'none' | 'not_stated'; description: string | null; evidence: string | null }
     mileages: { system: string; points_text: string | null; condition: string | null; evidence: string }[]
   } }

@@ -1,4 +1,5 @@
 from datetime import date
+from app.models import Notice
 from app.schemas import AnalysisData
 
 def test_profile_requires_both_interest_types(client,user_factory):
@@ -41,6 +42,32 @@ def test_recommendations_use_profile_and_exclude_expired(client,user_factory,not
     assert score["score"] == 100
     assert sum(x["score"] for x in score["breakdown"]) == score["score"]
     assert len(score["reasons"]) > 0
+
+def test_recommendations_filter_ai_success_before_pagination(client, app, user_factory, notice_factory):
+    headers, _ = user_factory()
+    analyzed = notice_factory()
+    needs_review = notice_factory()
+    legacy = notice_factory()
+    failed = notice_factory()
+    manual = notice_factory()
+    with app.state.sessions() as db:
+        for ident, provider, status in (
+            (analyzed, "openai", "analyzed"),
+            (needs_review, "openai", "needs_review"),
+            (legacy, "gemini", "analyzed"),
+            (failed, "rules_fallback", "failed"),
+            (manual, "manual", "reviewed"),
+        ):
+            analysis = db.get(Notice, ident).analysis
+            analysis.provider, analysis.status = provider, status
+        db.commit()
+    first = client.get("/api/notices/recommended", headers=headers,
+                       params={"analysis_success_only": "true", "page_size": 1}).json()
+    second = client.get("/api/notices/recommended", headers=headers,
+                        params={"analysis_success_only": "true", "page_size": 1, "page": 2}).json()
+    assert first["total"] == second["total"] == 2
+    assert {first["items"][0]["id"], second["items"][0]["id"]} == {analyzed, needs_review}
+    assert client.get("/api/notices/recommended", headers=headers).json()["total"] == 5
 
 def test_new_uses_original_date_not_insertion_order(client,notice_factory):
     first=notice_factory(posted=date(2026,9,18))
@@ -93,4 +120,3 @@ def test_invalid_optional_token_does_not_become_anonymous(client):
 
 def test_only_three_source_codes_accepted(client):
     assert client.get("/api/notices?source=SCNU_GLOCAL").status_code == 422
-

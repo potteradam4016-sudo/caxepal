@@ -35,13 +35,16 @@ export const api = {
     for (const category of filters.categories) query.append('category', category)
     if (filters.source && filters.source !== 'all') query.set('source', filters.source)
     if (filters.deadlineSoon) query.set('closing_days', '7')
+    if (kind === 'recommended' && filters.analysisSuccessOnly) query.set('analysis_success_only', 'true')
     const data = await request<NoticePageDto>(`/notices/${kind}?${query}`, { signal })
     return { items: data.items.map(toNotice), total: data.total, page: data.page, pageSize: data.page_size, profileVersion: data.profile_version ?? null }
   },
   async detail(id: number, signal?: AbortSignal): Promise<NoticeDetail> {
     const dto = await request<NoticeDetailDto>(`/notices/${id}`, { signal })
     const data = dto.analysis.data
-    return { ...toNotice(dto), body: dto.body_text, target: data.target_text, applicationMethod: data.application_method,
+    return { ...toNotice(dto), body: dto.body_text, target: data.target_text,
+      recruitmentText: data.recruitment_text ?? null, applicationMethod: data.application_method,
+      analysisStatus: dto.analysis.status,
       schedules: data.schedules, prize: data.prize, mileages: data.mileages, attachments: dto.attachments }
   },
   async favorites(signal?: AbortSignal): Promise<number[]> {

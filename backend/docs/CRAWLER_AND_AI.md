@@ -125,16 +125,20 @@ AI 서비스가 없을 때도 API·DB·날짜·추천 파이프라인을 시험�
 ```dotenv
 AI_PROVIDER=openai
 OPENAI_API_KEY=<서버에서만 보관하는 실제 키>
-OPENAI_MODEL=<해당 계정에서 사용할 수 있는 Structured Outputs 지원 모델 ID>
+OPENAI_MODEL=gpt-5.6-sol
 ```
 
-실제로 사용할 모델 ID를 설정합니다. 예시 모델을 확인 없이 유효한 것으로 가정하지 않습니다.
-응답 API의 strict JSON schema 형식으로 요청하고 Pydantic 검증·근거 문자열·날짜·시간 검사를 거칩니다.
+실제로 계정에서 사용할 수 있고 구조화 출력을 지원하는 모델 ID를 설정합니다.
+OpenAI Responses API의 strict JSON Schema 형식으로 카테고리·관심사·대상·신청 방법·상금 근거·요약을 추출합니다. 요청에는 `store=false`를 설정합니다.
+표는 수집 시 행·열 순서를 텍스트로 보존합니다. 모집인원은 지원 자격과 별도 보관하고 추천의 강제 자격 필터에 쓰지 않습니다.
+일정·마일리지는 원문에 명시된 근거를 규칙으로 추출하며, 상금도 명시된 금액이 있는 표에서는 규칙 결과를 사용합니다. Pydantic·근거 문자열·날짜·시간 검사를 거칩니다.
 공지 원문을 실행 지시로 취급하지 않고 도구·링크 접근 기능도 주지 않습니다.
-`store=false`를 사용하지만 이것만으로 공급자의 모든 로그·보존 정책이 없어지는 것은 아닙니다.
-외부 전송 승인·비용 한도·공급자의 정책은 팀이 확인해야 합니다.
+OpenAI의 데이터 처리·로그·보존 정책, 외부 전송 승인과 비용 한도는 팀이 확인해야 합니다.
 
-최대 두 번의 분석 시도 후 실패하면 `provider=rules_fallback`, `status=failed`와 경고를 기록합니다.
+일시적인 네트워크·요청 제한·서버·응답 오류만 최대 두 번 시도합니다. 잘못된 요청·키·모델 오류는 재시도하지 않습니다.
+실패하면 `provider=rules_fallback`, `status=failed`와 `AI_EXTRACTION_FAILED` 및 원인 코드(`AI_REQUEST_ERROR`, `AI_AUTH_ERROR`, `AI_MODEL_ERROR`, `AI_RATE_LIMITED`, `AI_SERVER_ERROR`, `AI_NETWORK_CONNECT`, `AI_NETWORK_TIMEOUT`, `AI_NETWORK_PROTOCOL`, `AI_NETWORK_ERROR`, `AI_RESPONSE_INVALID`, `AI_RESPONSE_SCHEMA_INVALID`, `AI_RESPONSE_INCOMPLETE`, `AI_RESPONSE_REFUSED`, `AI_GROUNDING_FAILED`)를 기록합니다. 키와 원문은 오류 코드에 포함하지 않습니다.
+HTTP 실패에는 `AI_HTTP_503`처럼 실제 상태 코드와, OpenAI 오류 코드가 허용된 값일 때만 `AI_REMOTE_RATE_LIMIT_EXCEEDED` 같은 코드를 추가합니다. 응답의 자유 형식 오류 메시지는 저장하지 않습니다. `reanalyze --notice-id N` 또는 `--limit 1`은 공지 ID·분석 상태·저장 여부·안전한 오류 코드를 터미널에 출력합니다.
+규칙 분석도 원문에 명시된 신청 방법을 추출합니다.
 규칙 결과를 조용히 AI 성공으로 바꾸지 않습니다.
 수집을 한 번 수행할 때마다 신규/변경 건에 AI 비용이 발생할 수 있습니다.
 사용자별 추천 조회 때 다시 AI를 호출하지 않습니다.
@@ -167,11 +171,20 @@ AI 설정 또는 파서를 바꾸어도 기존 동일 hash 공지는 자동 재�
 ```powershell
 .venv\Scripts\python.exe -m app.cli reanalyze --notice-id 1
 .venv\Scripts\python.exe -m app.cli reanalyze --limit 100
+.venv\Scripts\python.exe -m app.cli reanalyze --failed-only --limit 100
+.venv\Scripts\python.exe -m app.cli reanalyze --refresh-fallback --limit 100
 ```
+
+`--failed-only`는 실패 상태인 공지만 OpenAI로 재시도합니다. `AI_RATE_LIMITED`가 지속되면 배치를 중단하므로 할당량이 회복된 뒤 다시 실행합니다. `--refresh-fallback`은 OpenAI를 호출하지 않고 실패 공지의 규칙 추출 결과만 새로 계산하며, 실패 상태와 기존 AI 오류 코드를 유지합니다. 신청 방법의 띄어쓰기 변형과 시작일 미정인 단측 마감일을 지원하되, 생략된 연도나 날짜는 추정하지 않습니다.
+
+이전 Gemini 분석 데이터를 정리할 때는 worker를 멈추고 `purge-gemini-analyses`를 실행합니다.
+`gemini` 결과만 원문 기반 `rules / needs_review`로 교체하며 공지·찜은 남습니다.
+`--include-failed-fallbacks`는 제공자를 구분할 수 없는 모든 `rules_fallback / failed` 결과까지 정리하므로,
+OpenAI 실패가 아직 섞이지 않았을 때만 사용합니다.
 
 ID는 실제 공지 ID로 바꿉니다.
 수동 검수된 결과는 기본적으로 보호하며 `--include-reviewed`를 지정해야 다시 덮어쓸 수 있습니다.
-재분석·원문 변경은 추출 일정과 추천에도 영향을 줄 수 있으므로 찜·캘린더를 함께 확인합니다.
+재분석 중 AI가 실패해도 기존 `analyzed`·`reviewed` 결과는 유지합니다. 재분석·원문 변경은 추출 일정과 추천에도 영향을 줄 수 있으므로 찜·캘린더를 함께 확인합니다.
 
 관리자는 상세의 최신 `content_hash`와 수정한 전체 AnalysisData를
 `PUT /api/admin/notices/{id}/analysis`로 제출할 수 있습니다.

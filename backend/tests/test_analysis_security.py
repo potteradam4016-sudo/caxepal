@@ -1,9 +1,12 @@
+import json
 from datetime import date
+import httpx
 import pytest
+import sys
 from pydantic import ValidationError
 from sqlalchemy import select
 from app.config import Settings
-from app.models import AuditLog, User
+from app.models import AuditLog, Notice, User
 from app.schemas import AnalysisData
 from app.services import analysis as module
 from app.services.analysis import extract_rules, validate_grounding
@@ -43,6 +46,348 @@ def test_ai_fallback_is_explicit(settings,monkeypatch):
     data,provider,status,warnings=module.analyze(settings,"교육","테스트")
     assert provider=="rules_fallback" and status=="failed"
     assert "AI_EXTRACTION_FAILED" in warnings
+
+def test_rule_fallback_extracts_literal_application_method():
+    body = "○ 신청방법 : SW중심대학사업단 홈페이지 - 재학생 프로그램 참여신청\n상금: 없음\nNOVA 마일리지 20점 제공"
+    data, _ = extract_rules("AI 교육", body)
+    assert data.application_method == "SW중심대학사업단 홈페이지 - 재학생 프로그램 참여신청"
+    assert data.prize.status == "none"
+    assert data.mileages[0].points_text == "20점"
+    assert extract_rules("AI 교육", "신청 방법은 추후 안내합니다.")[0].application_method is None
+
+def test_rule_fallback_handles_spaced_method_and_one_sided_deadline():
+    body = "신청 기간: ~ 2026. 9. 15.(화)까지\n- 신 청방법 : 담당자 이메일로 신청서류 제출"
+    data, _ = extract_rules("학술대회 지원", body)
+    assert data.application_method == "담당자 이메일로 신청서류 제출"
+    assert len(data.schedules) == 1
+    assert data.schedules[0].start_date is None
+    assert data.schedules[0].end_date == date(2026, 9, 15)
+    abbreviated, _ = extract_rules("교육", "신청기간: 2026. 9. 21. ~ 10. 8.까지")
+    assert not any(item.end_date for item in abbreviated.schedules)
+
+
+def test_recruitment_and_flattened_award_table_keep_literal_evidence():
+    body = ("○ 모집인원 : 10 명 (AI·SW 전공자 8 명 , 비전공자 2 명 )\n"
+            "○ 시상 내역 구분\n팀 수\n상금 ( 팀당 )\n비고\n"
+            "대상\n1 팀\n200만 원 + 현물 (100만 원 상당 )\n기관장상\n"
+            "최우수상\n2 팀\n각 200만 원\n총장상\n▼ 자세한 안내")
+    data, _ = extract_rules("SUMTECH Hackathon", body)
+    assert data.target_text is None
+    assert data.recruitment_text == "○ 모집인원 : 10 명 (AI·SW 전공자 8 명 , 비전공자 2 명 )"
+    assert "모집인원" in data.summary_lines[0]
+    assert data.prize.status == "present"
+    assert "대상\n1 팀\n200만 원" in data.prize.evidence
+    assert "최우수상\n2 팀\n각 200만 원" in data.prize.description
+    assert "자세한 안내" not in data.prize.description
+    assert validate_grounding(data, "SUMTECH Hackathon", body).prize.status == "present"
+
+
+def test_unrelated_amount_does_not_become_prize():
+    data, _ = extract_rules("교육", "모집인원: 10명\n참가 경비 100만 원 지원")
+    assert data.recruitment_text == "모집인원: 10명"
+    assert data.prize.status == "not_stated"
+
+
+def test_ai_cannot_treat_recruitment_capacity_as_eligibility():
+    body = "모집인원: 10명 (AI·SW 전공자 8명, 비전공자 2명)"
+    data, _ = extract_rules("프로그램", body)
+    data.target_text = body
+    checked = validate_grounding(data, "프로그램", body)
+    assert checked.target_text is None
+    assert checked.recruitment_text == body
+    assert checked.summary_lines[0].startswith("대상: 미기재")
+
+def test_application_method_reaches_notice_detail(client, notice_factory):
+    body = "○ 신청방법 : SW중심대학사업단 홈페이지 - 재학생 프로그램 참여신청"
+    notice_id = notice_factory(body=body)
+    detail = client.get(f"/api/notices/{notice_id}").json()
+    assert detail["analysis"]["data"]["application_method"] == "SW중심대학사업단 홈페이지 - 재학생 프로그램 참여신청"
+
+@pytest.mark.parametrize("status,expected_calls,expected_code", [
+    (400, 1, "AI_REQUEST_ERROR"), (429, 2, "AI_RATE_LIMITED"),
+])
+def test_openai_http_failures_are_classified(settings, monkeypatch, status, expected_calls, expected_code):
+    settings.ai_provider = "openai"
+    monkeypatch.setattr(module.time, "sleep", lambda _: None)
+    calls = []
+
+    def fail(*_):
+        calls.append(1)
+        raise module.AnalysisFailure(expected_code, status == 429)
+
+    monkeypatch.setattr(module, "openai_extract", fail)
+    _data, provider, state, warnings = module.analyze(settings, "AI 교육", "신청방법: 홈페이지")
+    assert len(calls) == expected_calls
+    assert (provider, state) == ("rules_fallback", "failed")
+    assert expected_code in warnings
+
+def test_openai_configuration_requires_key_and_model():
+    with pytest.raises(ValidationError, match="OPENAI_API_KEY"):
+        Settings(_env_file=None, secret_key="x"*40, ai_provider="openai", openai_api_key="")
+    configured = Settings(_env_file=None, secret_key="x"*40, ai_provider="openai",
+                          openai_api_key="test-key", openai_model="gpt-5.6-sol")
+    assert configured.ai_provider == "openai"
+
+def openai_response(output):
+    return {"status": "completed", "output": [{"type": "message", "status": "completed",
+            "content": [{"type": "output_text", "text": json.dumps(output, default=str, ensure_ascii=False)}]}]}
+
+
+def test_openai_uses_structured_output_and_server_side_key(settings):
+    title = "AI 교육"
+    body = "대상: 전 학과 재학생\n신청 마감: 2026.09.30 18:00"
+    expected, _ = extract_rules(title, body)
+    settings.openai_api_key = "test-openai-key"
+    settings.openai_model = "gpt-5.6-sol"
+
+    def handler(request):
+        assert request.url.host == "api.openai.com"
+        assert request.url.path == "/v1/responses"
+        assert request.headers["Authorization"] == "Bearer test-openai-key"
+        assert "test-openai-key" not in str(request.url)
+        payload = json.loads(request.content)
+        assert payload["store"] is False
+        assert payload["model"] == "gpt-5.6-sol"
+        output = payload["text"]["format"]
+        assert output["type"] == "json_schema" and output["strict"] is True
+        assert output["schema"]["additionalProperties"] is False
+        assert set(output["schema"]["properties"]) == set(output["schema"]["required"])
+        values = expected.model_dump(mode="json")
+        return httpx.Response(200, json=openai_response({name: values[name]
+            for name in module.openai_schema()["properties"]}))
+
+    result = module.openai_extract(settings, title, body, httpx.MockTransport(handler))
+    assert result.summary_lines == expected.summary_lines
+
+@pytest.mark.parametrize("status,code,retryable", [
+    (400, "AI_REQUEST_ERROR", False), (404, "AI_MODEL_ERROR", False),
+    (429, "AI_RATE_LIMITED", True), (503, "AI_SERVER_ERROR", True),
+])
+def test_openai_http_response_classification(settings, status, code, retryable):
+    settings.openai_api_key = "test-openai-key"
+    transport = httpx.MockTransport(lambda _request: httpx.Response(status))
+    with pytest.raises(module.AnalysisFailure) as error:
+        module.openai_extract(settings, "교육", "신청방법: 홈페이지", transport)
+    assert (error.value.code, error.value.retryable) == (code, retryable)
+    assert error.value.diagnostics == (f"AI_HTTP_{status}",)
+
+def test_openai_error_diagnostics_exclude_message_and_unrecognized_code(settings):
+    settings.openai_api_key = "test-openai-key"
+    body = {"error": {"code": "rate_limit_exceeded", "message": "secret-key and private notice body"}}
+    transport = httpx.MockTransport(lambda _request: httpx.Response(503, json=body))
+    with pytest.raises(module.AnalysisFailure) as error:
+        module.openai_extract(settings, "교육", "신청방법: 홈페이지", transport)
+    assert error.value.diagnostics == ("AI_HTTP_503", "AI_REMOTE_RATE_LIMIT_EXCEEDED")
+    assert "secret-key" not in repr(error.value)
+    body["error"]["code"] = "PRIVATE_VALUE"
+    with pytest.raises(module.AnalysisFailure) as error:
+        module.openai_extract(settings, "교육", "신청방법: 홈페이지", transport)
+    assert error.value.diagnostics == ("AI_HTTP_503",)
+
+def test_openai_error_diagnostics_reach_fallback_warnings(settings, monkeypatch):
+    settings.ai_provider = "openai"
+    monkeypatch.setattr(module.time, "sleep", lambda _: None)
+    def fail(*_):
+        raise module.AnalysisFailure("AI_SERVER_ERROR", True, ("AI_HTTP_503", "AI_REMOTE_RATE_LIMIT_EXCEEDED"))
+    monkeypatch.setattr(module, "openai_extract", fail)
+    _data, provider, status, warnings = module.analyze(settings, "교육", "신청방법: 홈페이지")
+    assert (provider, status) == ("rules_fallback", "failed")
+    assert warnings[-3:] == ["AI_SERVER_ERROR", "AI_HTTP_503", "AI_REMOTE_RATE_LIMIT_EXCEEDED"]
+
+def test_openai_malformed_response_is_classified(settings):
+    settings.openai_api_key = "test-openai-key"
+    transport = httpx.MockTransport(lambda _request: httpx.Response(200, json={"status": "completed", "output": []}))
+    with pytest.raises(module.AnalysisFailure) as error:
+        module.openai_extract(settings, "교육", "신청방법: 홈페이지", transport)
+    assert error.value.code == "AI_RESPONSE_INVALID"
+
+
+@pytest.mark.parametrize("response,code,retryable", [
+    ({"status": "incomplete", "incomplete_details": {"reason": "max_output_tokens"}},
+     "AI_RESPONSE_INCOMPLETE", True),
+    ({"status": "completed", "output": [{"type": "message", "status": "completed",
+        "content": [{"type": "refusal", "refusal": "private text"}]}]},
+     "AI_RESPONSE_REFUSED", False),
+])
+def test_openai_incomplete_and_refusal(settings, response, code, retryable):
+    settings.openai_api_key = "test-openai-key"
+    transport = httpx.MockTransport(lambda _request: httpx.Response(200, json=response))
+    with pytest.raises(module.AnalysisFailure) as error:
+        module.openai_extract(settings, "교육", "신청방법: 홈페이지", transport)
+    assert (error.value.code, error.value.retryable) == (code, retryable)
+    assert "private text" not in repr(error.value)
+
+
+def test_openai_insufficient_quota_is_not_retried(settings):
+    settings.openai_api_key = "test-openai-key"
+    transport = httpx.MockTransport(lambda _request: httpx.Response(429,
+        json={"error": {"code": "insufficient_quota"}}))
+    with pytest.raises(module.AnalysisFailure) as error:
+        module.openai_extract(settings, "교육", "신청방법: 홈페이지", transport)
+    assert error.value.code == "AI_RATE_LIMITED"
+    assert error.value.retryable is False
+    assert error.value.diagnostics == ("AI_HTTP_429", "AI_REMOTE_INSUFFICIENT_QUOTA")
+
+def test_openai_rejects_ungrounded_method(settings):
+    settings.openai_api_key = "test-openai-key"
+    expected, _ = extract_rules("AI 교육", "신청방법: 홈페이지")
+    values = expected.model_dump(mode="json")
+    output = {name: values[name] for name in module.openai_schema()["properties"]}
+    output["application_method"] = "원문에 없는 포털"
+    transport = httpx.MockTransport(lambda _request: httpx.Response(200, json=openai_response(output)))
+    with pytest.raises(module.AnalysisFailure) as error:
+        module.openai_extract(settings, "AI 교육", "신청방법: 홈페이지", transport)
+    assert error.value.code == "AI_GROUNDING_FAILED"
+
+
+def test_openai_analysis_is_saved_and_returned(client, settings, notice_factory, monkeypatch):
+    body = "신청방법: SW중심대학사업단 홈페이지 - 재학생 프로그램 참여신청"
+    settings.ai_provider = "openai"
+
+    def extract(_settings, title, text):
+        assert text == body
+        data, _ = extract_rules(title, text)
+        data.confidence = 0.9
+        return data
+
+    monkeypatch.setattr(module, "openai_extract", extract)
+    notice_id = notice_factory(body=body)
+    detail = client.get(f"/api/notices/{notice_id}").json()
+    assert detail["analysis"]["provider"] == "openai"
+    assert detail["analysis"]["status"] == "analyzed"
+    assert detail["analysis"]["data"]["application_method"] == \
+        "SW중심대학사업단 홈페이지 - 재학생 프로그램 참여신청"
+
+
+def test_purge_gemini_analyses_keeps_notices_and_bookmarks(
+        client, app, settings, user_factory, notice_factory, monkeypatch, capsys):
+    from app import cli
+
+    headers, _ = user_factory()
+    legacy_id = notice_factory(body="신청방법: 홈페이지에서 신청")
+    current_id = notice_factory(body="신청방법: 방문 신청")
+    failed_id = notice_factory(body="신청방법: 이메일로 접수")
+    with app.state.sessions() as db:
+        legacy = db.get(Notice, legacy_id)
+        legacy.analysis.provider = "gemini"
+        legacy.analysis.status = "analyzed"
+        legacy.analysis.warnings = ["AI_REQUIRES_ORIGINAL_CHECK"]
+        current = db.get(Notice, current_id)
+        current.analysis.provider = "openai"
+        current.analysis.status = "analyzed"
+        failed = db.get(Notice, failed_id)
+        failed.analysis.provider = "rules_fallback"
+        failed.analysis.status = "failed"
+        failed.analysis.warnings = ["AI_EXTRACTION_FAILED", "AI_RATE_LIMITED"]
+        db.commit()
+    assert client.post(f"/api/bookmarks/{legacy_id}", headers=headers).status_code == 204
+    monkeypatch.setattr(cli, "get_settings", lambda: settings)
+    monkeypatch.setattr(sys, "argv", ["app.cli", "purge-gemini-analyses"])
+    cli.main()
+    assert "Gemini 분석 1건" in capsys.readouterr().out
+    detail = client.get(f"/api/notices/{legacy_id}", headers=headers).json()
+    assert detail["is_bookmarked"] is True
+    assert detail["analysis"]["provider"] == "rules"
+    assert detail["analysis"]["status"] == "needs_review"
+    assert detail["analysis"]["data"]["application_method"] == "홈페이지에서 신청"
+    assert all(not warning.startswith("AI_") for warning in detail["analysis"]["warnings"])
+    assert client.get(f"/api/notices/{current_id}").json()["analysis"]["provider"] == "openai"
+    assert client.get(f"/api/notices/{failed_id}").json()["analysis"]["provider"] == "rules_fallback"
+
+    monkeypatch.setattr(sys, "argv", ["app.cli", "purge-gemini-analyses", "--include-failed-fallbacks"])
+    cli.main()
+    failed_detail = client.get(f"/api/notices/{failed_id}").json()
+    assert failed_detail["analysis"]["provider"] == "rules"
+    assert failed_detail["analysis"]["status"] == "needs_review"
+    assert all(not warning.startswith("AI_") for warning in failed_detail["analysis"]["warnings"])
+    assert client.get(f"/api/notices/{current_id}").json()["analysis"]["provider"] == "openai"
+
+def test_reanalysis_failure_preserves_analyzed_result(app, settings, notice_factory, monkeypatch, capsys):
+    from app import cli
+
+    notice_id = notice_factory(body="신청방법: 홈페이지")
+    with app.state.sessions() as db:
+        notice = db.get(Notice, notice_id)
+        notice.analysis.status = "analyzed"
+        notice.analysis.provider = "gemini"
+        db.commit()
+    monkeypatch.setattr(cli, "get_settings", lambda: settings)
+    def failed_analysis(*_):
+        data, warnings = extract_rules("AI 교육", "신청방법: 홈페이지")
+        return data, "rules_fallback", "failed", warnings + ["AI_REQUEST_ERROR"]
+    monkeypatch.setattr(cli, "analyze", failed_analysis)
+    monkeypatch.setattr(sys, "argv", ["app.cli", "reanalyze", "--notice-id", str(notice_id)])
+    cli.main()
+    assert f"notice_id={notice_id} provider=rules_fallback status=failed saved=False codes=AI_REQUEST_ERROR" in capsys.readouterr().out
+    with app.state.sessions() as db:
+        notice = db.get(Notice, notice_id)
+        assert (notice.analysis.provider, notice.analysis.status) == ("gemini", "analyzed")
+
+def test_reanalysis_failed_only_skips_successful_notice(app, settings, notice_factory, monkeypatch):
+    from app import cli
+
+    failed_id = notice_factory(body="신청방법: 홈페이지에서 신청")
+    successful_id = notice_factory(body="신청방법: 담당 부서 방문 신청")
+    with app.state.sessions() as db:
+        db.get(Notice, failed_id).analysis.status = "failed"
+        db.get(Notice, successful_id).analysis.status = "analyzed"
+        db.commit()
+    visited = []
+    monkeypatch.setattr(cli, "get_settings", lambda: settings)
+
+    def record_analysis(_settings, _title, body, _image_only):
+        visited.append(body)
+        data, warnings = extract_rules("교육", body)
+        return data, "rules_fallback", "failed", warnings
+
+    monkeypatch.setattr(cli, "analyze", record_analysis)
+    monkeypatch.setattr(sys, "argv", ["app.cli", "reanalyze", "--failed-only"])
+    cli.main()
+    assert len(visited) == 1
+    assert "홈페이지에서 신청" in visited[0]
+
+@pytest.mark.parametrize("first_status", ["failed", "analyzed"])
+def test_reanalysis_stops_after_rate_limit(app, settings, notice_factory, monkeypatch, first_status):
+    from app import cli
+
+    first_id = notice_factory(body="신청방법: 홈페이지에서 신청")
+    notice_factory(body="신청방법: 담당 부서 방문 신청")
+    with app.state.sessions() as db:
+        db.get(Notice, first_id).analysis.status = first_status
+        db.commit()
+    visited = []
+    monkeypatch.setattr(cli, "get_settings", lambda: settings)
+
+    def rate_limited(_settings, _title, body, _image_only):
+        visited.append(body)
+        data, warnings = extract_rules("교육", body)
+        return data, "rules_fallback", "failed", warnings + ["AI_RATE_LIMITED"]
+
+    monkeypatch.setattr(cli, "analyze", rate_limited)
+    monkeypatch.setattr(sys, "argv", ["app.cli", "reanalyze"])
+    cli.main()
+    assert len(visited) == 1
+    with app.state.sessions() as db:
+        assert db.get(Notice, first_id).analysis.status == first_status
+
+def test_refresh_fallback_preserves_failure_and_skips_openai(app, settings, notice_factory, monkeypatch):
+    from app import cli
+
+    notice_id = notice_factory(body="신 청방법: 홈페이지에서 신청")
+    with app.state.sessions() as db:
+        notice = db.get(Notice, notice_id)
+        notice.analysis.status = "failed"
+        notice.analysis.warnings = ["AI_EXTRACTION_FAILED", "AI_RATE_LIMITED"]
+        db.commit()
+    monkeypatch.setattr(cli, "get_settings", lambda: settings)
+    monkeypatch.setattr(cli, "analyze", lambda *_: pytest.fail("OpenAI must not be called"))
+    monkeypatch.setattr(sys, "argv", ["app.cli", "reanalyze", "--refresh-fallback"])
+    cli.main()
+    with app.state.sessions() as db:
+        analysis = db.get(Notice, notice_id).analysis
+        assert analysis.status == "failed"
+        assert analysis.data["application_method"] == "홈페이지에서 신청"
+        assert "AI_RATE_LIMITED" in analysis.warnings
 
 def test_ai_unfounded_date_rejected():
     text="신청 마감: 2026.09.30 18:00"
@@ -191,6 +536,15 @@ def test_ai_prize_cannot_contradict_negative_evidence():
     data.prize.status = "present"
     with pytest.raises(ValueError, match="contradicts"):
         validate_grounding(data, "교육", "상금: 없음")
+
+
+def test_ai_prize_requires_award_label_in_evidence():
+    body = "행사 참가 경비 200만 원 지원"
+    data, _ = extract_rules("교육", body)
+    data.prize.status = "present"
+    data.prize.evidence = body
+    with pytest.raises(ValueError, match="award label"):
+        validate_grounding(data, "교육", body)
 
 def test_ai_summary_cannot_invent_freeform_benefit():
     body = "대상: 전 학과 재학생"

@@ -143,6 +143,7 @@ ID를 화면 코드에 임의 생성하지 말고 API 응답을 사용합니다.
 신규 목록 자체는 신청 상태와 별개로 원문 등록일 내림차순입니다.
 
 `/recommended`는 `min_score`(0~100)를 추가로 받습니다.
+개발 중 분석 결과 확인용 `analysis_success_only=true`는 `provider=openai`이고 `status`가 `analyzed` 또는 `needs_review`인 공지만 반환합니다. `manual/reviewed`와 규칙 분석 결과는 제외합니다. 정확성 검수 완료를 뜻하지는 않습니다.
 기본 설정은 0이지만 **실제 기여 항목이 없는 0점 결과는 노출하지 않습니다**.
 추천도 계산 전에 마감·명확한 자격 불일치를 제외합니다.
 같은 점수는 ID 순서로 정렬하며 최신성·임박성으로 동점을 깨지 않습니다.
@@ -193,11 +194,14 @@ ID를 화면 코드에 임의 생성하지 말고 API 응답을 사용합니다.
 | `analyzed_at` | 분석 완료 시각, Unix 초 |
 
 `data.summary_lines`는 정확히 세 줄, 대상 / 활동 / 신청·행사 일정입니다.
+`data.recruitment_text`는 원문에 명시된 모집인원 문구이며 없으면 `null`입니다. 지원 자격인 `target_text`와 구분하고 추천의 강제 자격 필터에 쓰지 않습니다.
+자동 분석 실패 시 `status=failed`, `provider=rules_fallback`이며 `warnings`에 실패 원인 코드가 포함됩니다. 프론트는 상세에서 원문 확인을 안내합니다.
 `target_*`은 근거가 확인된 경우에만 추천의 강제 자격 필터에 쓰입니다.
 본문이 이미지/첨부 위주인 경우 그 안의 조건을 읽었다고 가정하지 않습니다.
 AI 응답의 confidence는 교정된 정확도 지표가 아닙니다.
 
 상금은 `prize.status`로 구분합니다.
+표에 명시된 상금은 행·열 순서를 보존한 원문 근거를 `prize.description`에 줄 단위로 표시합니다. 합계·수상 가능성을 추정하지 않습니다.
 `present`는 있음, `none`은 없음이 명시됨, `not_stated`는 확인 불가/미기재입니다.
 설명이 없으면 금액을 0원으로 표시하지 않습니다.
 `mileages`는 `system`, `points_text`, `condition`, `evidence`를 갖는 배열입니다.

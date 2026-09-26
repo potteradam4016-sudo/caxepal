@@ -34,7 +34,7 @@ def detail(notice, bookmarks=None, recommendation=None):
     return result
 
 def filtered_query(source=None, q=None, category=None, include_closed=True,
-                   after=None, deadline_before=None, now=None):
+                   after=None, deadline_before=None, now=None, analysis_success_only=False):
     now = now_ts() if now is None else now
     stmt = select(Notice).join(NoticeAnalysis)
     if source:
@@ -44,6 +44,9 @@ def filtered_query(source=None, q=None, category=None, include_closed=True,
     if category:
         categories = [category] if isinstance(category, str) else category
         stmt = stmt.where(NoticeAnalysis.category.in_(categories))
+    if analysis_success_only:
+        stmt = stmt.where(NoticeAnalysis.provider == "openai",
+                          NoticeAnalysis.status.in_(("analyzed", "needs_review")))
     if not include_closed:
         stmt = stmt.where((NoticeAnalysis.deadline_at.is_(None)) | (NoticeAnalysis.deadline_at >= now))
     if after:

@@ -15,6 +15,7 @@ from app.services.jobs import acquire_lease, enqueue, release_lease, run_next_jo
 FIXTURES=Path(__file__).parent/"fixtures"
 LIST=(FIXTURES/"list.html").read_text(encoding="utf-8")
 DETAIL=(FIXTURES/"detail.html").read_text(encoding="utf-8")
+AWARDS=(FIXTURES/"detail_awards.html").read_text(encoding="utf-8")
 
 def test_list_parser_deduplicates_pinned_and_supports_data_id():
     rows=parse_list(LIST,"SCNU_SW")
@@ -32,6 +33,30 @@ def test_detail_parser_strips_scripts_and_retains_dates():
     assert parsed.attachments[0]["name"]=="안내문.pdf"
     assert parsed.attachments[0]["url"].startswith("https://www.scnu.ac.kr/")
     assert len(parsed.content_hash)==64
+
+
+def test_award_table_preserves_rows_and_cells():
+    listed = ListedNotice("12345", "SUMTECH Hackathon", date(2026, 9, 18),
+                          "https://www.scnu.ac.kr/scnusw/na/ntt/selectNttInfo.do?nttSn=12345")
+    parsed = parse_detail(AWARDS, listed)
+    assert "구분 | 팀 수 | 상금 (팀당) | 비고" in parsed.body_text
+    assert "대상 | 1 팀 | 200만 원 + 현물 (100만 원 상당) | 기관장상" in parsed.body_text
+    assert "최우수상 | 2 팀 | 각 200만 원 | 총장상" in parsed.body_text
+
+
+def test_award_table_reaches_notice_api(client, app, settings):
+    listed = ListedNotice("12345", "SUMTECH Hackathon", date(2026, 9, 18),
+                          "https://www.scnu.ac.kr/scnusw/na/ntt/selectNttInfo.do?nttSn=12345")
+    parsed = parse_detail(AWARDS, listed)
+    assert upsert_notice(app.state.sessions, settings, "SCNU_SW", parsed) == "created"
+    with app.state.sessions() as db:
+        notice_id = db.scalar(select(Notice.id))
+    detail = client.get(f"/api/notices/{notice_id}").json()
+    data = detail["analysis"]["data"]
+    assert data["target_text"] is None
+    assert "모집인원 : 10 명" in data["recruitment_text"]
+    assert data["prize"]["status"] == "present"
+    assert "대상 | 1 팀 | 200만 원" in data["prize"]["description"]
 
 def test_parser_fails_closed_for_unknown_html():
     with pytest.raises(ParseError):

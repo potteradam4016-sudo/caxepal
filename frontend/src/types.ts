@@ -21,10 +21,11 @@ export interface Notice {
   isBookmarked: boolean; needsReview: boolean; recommendation: RecommendationDto | null; originalUrl: string
 }
 export interface NoticeDetail extends Notice {
-  body: string; target: string | null; applicationMethod: string | null; schedules: ScheduleDto[]
+  body: string; target: string | null; recruitmentText: string | null; applicationMethod: string | null; schedules: ScheduleDto[]
+  analysisStatus: string
   prize: NoticeDetailDto['analysis']['data']['prize']
   mileages: NoticeDetailDto['analysis']['data']['mileages']
   attachments: NoticeDetailDto['attachments']
 }
-export interface NoticeFilters { query: string; categories: Category[]; source?: SourceCode | 'all'; deadlineSoon?: boolean }
+export interface NoticeFilters { query: string; categories: Category[]; source?: SourceCode | 'all'; deadlineSoon?: boolean; analysisSuccessOnly?: boolean }
 export interface NoticePage { items: Notice[]; total: number; page: number; pageSize: number; profileVersion: number | null }

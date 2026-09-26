@@ -1,8 +1,10 @@
 """Run a local HTTP smoke check against an isolated temporary database."""
 import argparse
+from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
+import shutil
 import socket
 import subprocess
 import sys
@@ -12,6 +14,22 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+@contextmanager
+def temporary_workspace():
+    path = Path(tempfile.mkdtemp(prefix="scnu-pick-http-"))
+    try:
+        yield path
+    finally:
+        for attempt in range(20):
+            try:
+                shutil.rmtree(path)
+                break
+            except PermissionError:
+                if attempt == 19:
+                    raise
+                time.sleep(0.1)
 
 
 def main():
@@ -25,9 +43,10 @@ def main():
         sock.bind(("127.0.0.1", args.port))
         port = sock.getsockname()[1]
     checks = []
-    with tempfile.TemporaryDirectory(prefix="scnu-pick-http-") as tmp:
-        env = dict(os.environ, APP_ENV="test", SECRET_KEY="isolated-http-test-secret-" * 2,
-                   DATABASE_URL=f"sqlite:///{Path(tmp, 'test.sqlite3').as_posix()}",
+    with temporary_workspace() as tmp:
+        env = dict(os.environ, APP_ENV="test", AI_PROVIDER="rules",
+                   SECRET_KEY="isolated-http-test-secret-" * 2,
+                   DATABASE_URL=f"sqlite:///{(tmp / 'test.sqlite3').as_posix()}",
                    HOST="127.0.0.1", PORT=str(port), PYTHONUTF8="1")
         subprocess.run([sys.executable, "-m", "app.cli", "init-db"], cwd=ROOT, env=env,
                        check=True, capture_output=True, timeout=60)

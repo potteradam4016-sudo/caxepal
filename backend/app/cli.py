@@ -7,10 +7,10 @@ from alembic.config import Config
 from sqlalchemy import delete, select
 from app.config import BASE_DIR, get_settings
 from app.db import make_engine, session_factory
-from app.models import AuthSession, CrawlJob, Notice, RateBucket, User, now_ts
+from app.models import AuthSession, CrawlJob, Notice, NoticeAnalysis, RateBucket, User, now_ts
 from app.reference import seed_reference
 from app.schemas import CrawlInput
-from app.services.analysis import analyze, apply_analysis
+from app.services.analysis import analyze, apply_analysis, extract_rules
 from app.services.jobs import enqueue, run_next_job
 
 def migrate(settings):
@@ -43,12 +43,16 @@ def main():
     crawl.add_argument("--max-notices", type=int, default=5)
     crawl.add_argument("--max-age-days", type=int, default=60)
     sub.add_parser("cleanup")
+    purge = sub.add_parser("purge-gemini-analyses")
+    purge.add_argument("--include-failed-fallbacks", action="store_true")
     export = sub.add_parser("export-openapi")
     export.add_argument("--output", default="docs/openapi.json")
     reanalyze = sub.add_parser("reanalyze")
     reanalyze.add_argument("--notice-id", type=int)
     reanalyze.add_argument("--limit", type=int, default=100)
     reanalyze.add_argument("--include-reviewed", action="store_true")
+    reanalyze.add_argument("--failed-only", action="store_true")
+    reanalyze.add_argument("--refresh-fallback", action="store_true")
     args = parser.parse_args()
     settings = get_settings()
     if args.command == "init-db":
@@ -97,6 +101,19 @@ def main():
                     db.execute(delete(model).where(model.expires_at < now_ts()))
                 db.commit()
             print("만료된 세션·요청 제한 기록을 정리했습니다.")
+        elif args.command == "purge-gemini-analyses":
+            with factory() as db:
+                target = NoticeAnalysis.provider == "gemini"
+                if args.include_failed_fallbacks:
+                    target |= ((NoticeAnalysis.provider == "rules_fallback") &
+                               (NoticeAnalysis.status == "failed"))
+                notices = db.scalars(select(Notice).join(NoticeAnalysis)
+                    .where(target).with_for_update()).all()
+                for notice in notices:
+                    data, warnings = extract_rules(notice.title, notice.body_text, notice.image_only)
+                    apply_analysis(notice, data, "rules", "needs_review", warnings)
+                db.commit()
+            print(f"Gemini 분석 {len(notices)}건을 규칙 분석으로 교체했습니다. 공지와 찜은 유지했습니다.")
         elif args.command == "reanalyze":
             if not 1 <= args.limit <= 1000:
                 parser.error("--limit은 1~1000 범위여야 합니다.")
@@ -104,23 +121,43 @@ def main():
                 query = select(Notice.id).order_by(Notice.id).limit(args.limit)
                 if args.notice_id is not None:
                     query = query.where(Notice.id==args.notice_id)
+                if args.failed_only or args.refresh_fallback:
+                    query = query.join(NoticeAnalysis).where(NoticeAnalysis.status=="failed")
                 ids = db.scalars(query).all()
-            updated = 0
+            updated = retained = 0
             for ident in ids:
                 with factory() as db:
                     notice = db.get(Notice, ident)
                     if notice.analysis and notice.analysis.provider == "manual" and not args.include_reviewed:
                         continue
                     title, body, image_only, fingerprint = notice.title, notice.body_text, notice.image_only, notice.content_hash
-                result = analyze(settings, title, body, image_only)
+                    old_warnings = list(notice.analysis.warnings) if notice.analysis else []
+                if args.refresh_fallback:
+                    data, rule_warnings = extract_rules(title, body, image_only)
+                    failure_warnings = [item for item in old_warnings if item.startswith("AI_")]
+                    result = data, "rules_fallback", "failed", list(dict.fromkeys(rule_warnings + failure_warnings))
+                else:
+                    result = analyze(settings, title, body, image_only)
+                rate_limited = not args.refresh_fallback and "AI_RATE_LIMITED" in result[3]
+                saved = False
                 with factory() as db:
                     notice = db.get(Notice, ident)
                     if notice.content_hash != fingerprint:
                         continue
-                    apply_analysis(notice, *result)
-                    db.commit()
-                    updated += 1
-            print(f"공지 {updated}건을 재분석했습니다. 모의 공지는 추가하지 않았습니다.")
+                    if result[2] == "failed" and notice.analysis and notice.analysis.status in {"analyzed", "reviewed"}:
+                        retained += 1
+                    else:
+                        apply_analysis(notice, *result)
+                        db.commit()
+                        updated += 1
+                        saved = True
+                if args.notice_id is not None or args.limit == 1:
+                    codes = ",".join(item for item in result[3] if item.startswith("AI_")) or "none"
+                    print(f"notice_id={ident} provider={result[1]} status={result[2]} saved={saved} codes={codes}")
+                if rate_limited:
+                    print("OpenAI rate limit reached; stop this batch and retry later.")
+                    break
+            print(f"공지 {updated}건을 재분석하고, 기존 정상 결과 {retained}건을 유지했습니다. 모의 공지는 추가하지 않았습니다.")
     finally:
         engine.dispose()
 

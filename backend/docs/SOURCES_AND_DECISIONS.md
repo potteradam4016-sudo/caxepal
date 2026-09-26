@@ -22,8 +22,8 @@
   비밀번호 해시·인증 의존성 참고. 이 구현 자체는 해당 예제의 JWT 방식을 사용하지 않습니다.
 - SQLAlchemy의 SQLite 지원 문서: https://docs.sqlalchemy.org/en/20/dialects/sqlite.html
   충돌 처리와 SQLite 동작 참고. 앱 모델 및 마이그레이션은 제공 코드로 검증했습니다.
-- OpenAI 구조화 출력 안내: https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses
-  Responses API의 text.format / strict JSON schema 구조 참고. 실 API 호출은 하지 못했습니다.
+- OpenAI 구조화 출력 안내: https://developers.openai.com/api/docs/guides/structured-outputs
+  GenerateContent API의 JSON Schema 구조 참고. 실 API 호출은 별도 키로 검증해야 합니다.
 - PostgreSQL 행 수준 보안 정책: https://www.postgresql.org/docs/current/ddl-rowsecurity.html
   테이블 소유자/BYPASSRLS가 RLS를 우회한다는 보안 경계를 문서에 반영했습니다.
 - PostgreSQL 연결 암호화·인증서 검증: https://www.postgresql.org/docs/current/libpq-ssl.html

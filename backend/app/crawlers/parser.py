@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass
 from datetime import date
 from urllib.parse import parse_qs, urljoin, urlsplit
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 from app.reference import detail_url
 
 class ParseError(ValueError):
@@ -85,6 +85,15 @@ def parse_list(html: str, code: str) -> list[ListedNotice]:
 def plain_text(node):
     for el in node.select("script,style,noscript,iframe,object,form"):
         el.decompose()
+    for table in reversed(node.select("table")):
+        rows = []
+        for tr in table.select("tr"):
+            cells = tr.find_all(["th", "td"], recursive=False)
+            values = [re.sub(r"\s+", " ", cell.get_text(" ", strip=True)).strip() for cell in cells]
+            if any(values):
+                rows.append(" | ".join(values))
+        if rows:
+            table.replace_with(NavigableString("\n" + "\n".join(rows) + "\n"))
     for el in node.select("br"):
         el.replace_with("\n")
     for el in node.select("p,div,tr,li,h1,h2,h3,h4"):

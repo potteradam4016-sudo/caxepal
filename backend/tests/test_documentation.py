@@ -59,6 +59,7 @@ def test_environment_template_is_safe_and_not_private():
             values[name] = value
     assert values["SECRET_KEY"] == ""
     assert values["OPENAI_API_KEY"] == ""
+    assert values["OPENAI_MODEL"] == "gpt-5.6-sol"
     assert values["CRAWL_ENABLED"] == "false"
     assert values["AUTO_CRAWL"] == "false"
     assert values["AI_PROVIDER"] == "rules"

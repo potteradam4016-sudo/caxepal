@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     robots_policy: Literal["strict", "written_permission"] = "strict"
     ai_provider: Literal["rules", "openai"] = "rules"
     openai_api_key: str = ""
-    openai_model: str = ""
+    openai_model: str = "gpt-5.6-sol"
     request_limit_per_minute: int = Field(default=120, ge=1, le=10000)
     auth_limit_per_15_minutes: int = Field(default=10, ge=1, le=1000)
     max_request_bytes: int = Field(default=65536, ge=4096, le=1048576)

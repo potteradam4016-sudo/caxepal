@@ -71,6 +71,25 @@ macOS/Linux에서 `python` 명령이 없다면 `python3 start.py`를 사용합�
 
 `APP_ENV=production`은 SQLite·HTTP 프론트 주소를 거부합니다.
 
+OpenAI 분석을 켜려면 `backend/.env`에서 기존 `AI_PROVIDER=gemini`를
+`AI_PROVIDER=openai`로 바꾸고 `OPENAI_API_KEY`와 `OPENAI_MODEL=gpt-5.6-sol`을 설정합니다.
+기존 `GEMINI_API_KEY`·`GEMINI_MODEL`은 사용하지 않습니다. 키는 프론트에 넣거나 커밋하지 않습니다.
+설정 변경 후 API와 worker를 모두 재시작해야 새 설정이 적용됩니다.
+기존 Gemini 분석 결과만 지우고 원문 기반 규칙 결과로 교체하려면 worker를 멈춘 뒤
+`.venv\Scripts\python.exe -m app.cli purge-gemini-analyses`를 실행합니다. 공지·찜은 유지됩니다.
+이전 Gemini 호출에서 실패해 `rules_fallback`으로 저장된 결과도 정리하려면
+`--include-failed-fallbacks`를 붙입니다. 이 옵션은 제공자를 구분할 수 없는 모든 실패 대체 결과를
+대상으로 하므로, OpenAI 실패 결과가 섞이지 않았을 때만 사용합니다.
+
+PostgreSQL 전용 통합·동시성 테스트는 운영 DB와 분리된 `_test` 접미사 DB에서만 실행합니다.
+
+```powershell
+$env:TEST_DATABASE_URL="postgresql+psycopg://scnu_pick:<URL_ENCODED_PASSWORD>@127.0.0.1:5432/scnu_pick_test"
+.venv\Scripts\python.exe -m pytest -m postgres -p no:cacheprovider
+```
+
+테스트는 DB 이름이 `_test`로 끝나지 않으면 실행을 중단합니다. `TEST_DATABASE_URL`을 설정하지 않은 일반 테스트에서는 PostgreSQL 테스트를 건너뜁니다.
+
 이 구현은 **Supabase Auth 토큰이나 JWT를 받지 않습니다**.
 자체 로그인에서 발급한 내용을 해석할 수 없는 무작위 Bearer 세션 토큰을 사용합니다.
 Supabase를 선택할 때는 현재 구조에서는 PostgreSQL 호스팅 용도로만 연결합니다.

@@ -1932,6 +1932,16 @@
             }
           },
           {
+            "name": "analysis_success_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Analysis Success Only"
+            }
+          },
+          {
             "name": "page",
             "in": "query",
             "required": false,
@@ -3636,6 +3646,18 @@
               }
             ],
             "title": "Target Text"
+          },
+          "recruitment_text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recruitment Text"
           },
           "target_departments": {
             "items": {

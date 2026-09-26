@@ -122,6 +122,7 @@ class AnalysisData(StrictModel):
     activity_ids: list[str] = Field(max_length=20)
     tags: list[str] = Field(max_length=20)
     target_text: str | None = Field(max_length=3000)
+    recruitment_text: str | None = Field(default=None, max_length=1500)
     target_departments: list[str] = Field(max_length=50)
     target_grades: list[int] = Field(max_length=6)
     target_statuses: list[Status] = Field(max_length=4)
