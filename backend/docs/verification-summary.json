@@ -1,0 +1,37 @@
+{
+  "release": "2026-09-24-username-api-integration",
+  "environment": {
+    "os": "Windows",
+    "python": "3.12.14",
+    "database": "SQLite temporary databases"
+  },
+  "automated_tests": {
+    "passed": 105,
+    "failed": 0,
+    "command": "python -m pytest -q"
+  },
+  "live_http": {
+    "requests": 12,
+    "all_expected_statuses_matched": true,
+    "temporary_data_only": true
+  },
+  "openapi_matches_code": true,
+  "not_verified": [
+    "native START.cmd interaction",
+    "school site collection",
+    "external AI",
+    "production PostgreSQL",
+    "deployment"
+  ],
+  "frontend": {
+    "lint": "passed",
+    "typecheck": "passed",
+    "tests_passed": 16,
+    "build": "passed"
+  },
+  "live_frontend_proxy": {
+    "passed": true,
+    "path": "/api/notices/new",
+    "local_backend_database_only": true
+  }
+}

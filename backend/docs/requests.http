@@ -1,0 +1,25 @@
+@base = http://localhost:3104
+@token = REPLACE_WITH_LOGIN_TOKEN
+
+### 가입
+POST {{base}}/api/auth/register
+Content-Type: application/json
+
+{"username":"student01","password":"long-passphrase-123"}
+
+### 로그인
+POST {{base}}/api/auth/login
+Content-Type: application/json
+
+{"username":"student01","password":"long-passphrase-123"}
+
+### 현재 계정
+GET {{base}}/api/auth/me
+Authorization: Bearer {{token}}
+
+### 비밀번호 변경
+POST {{base}}/api/auth/change-password
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"current_password":"long-passphrase-123","new_password":"another-passphrase-123"}

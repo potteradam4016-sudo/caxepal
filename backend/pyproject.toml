@@ -1,0 +1,10 @@
+[project]
+name = "scnu-pick-backend"
+version = "1.0.0"
+requires-python = ">=3.11"
+description = "SCNU PICK backend-only collaboration implementation"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["error::DeprecationWarning:app.*"]

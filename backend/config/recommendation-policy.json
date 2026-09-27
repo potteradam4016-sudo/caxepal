@@ -1,0 +1,16 @@
+{
+  "version": "proposal-1",
+  "status": "team_review_required",
+  "weights": {
+    "field": 35,
+    "department": 25,
+    "academic_status": 15,
+    "grade": 10,
+    "activity": 15
+  },
+  "all_departments_score": 12,
+  "all_grades_score": 5,
+  "default_min_score": 0,
+  "closing_days": 7,
+  "note": "확정 기획서에서 미정인 가중치/임박 기간의 구현 제안값. 최신성/마감 가산 없음."
+}
