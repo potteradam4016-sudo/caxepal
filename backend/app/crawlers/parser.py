@@ -18,6 +18,7 @@ class ListedNotice:
     posted_date: date
     original_url: str
     pinned: bool = False
+    author_name: str | None = None
 
 @dataclass
 class ParsedNotice:
@@ -29,6 +30,7 @@ class ParsedNotice:
     attachments: list[dict]
     image_only: bool
     content_hash: str
+    author_name: str | None = None
 
 def parse_date(text):
     m = re.search(r"(?<!\d)(20\d{2})[./-]\s*(\d{1,2})[./-]\s*(\d{1,2})(?!\d)", text)
@@ -73,7 +75,9 @@ def parse_list(html: str, code: str) -> list[ListedNotice]:
                 raise ParseError("LIST_REQUIRED_FIELDS_MISSING")
             first = tr.find("td")
             pinned = bool(first and "공지" in first.get_text(" ", strip=True))
-            rows.append(ListedNotice(ident, title[:1000], posted, detail_url(code, ident), pinned))
+            author_cell = tr.select_one("td.BD_listUser")
+            author = author_cell.get_text(" ", strip=True)[:100] if author_cell else None
+            rows.append(ListedNotice(ident, title[:1000], posted, detail_url(code, ident), pinned, author))
             seen.add(ident)
             break
     if not rows:
@@ -102,6 +106,15 @@ def plain_text(node):
     return "\n".join(re.sub(r"[ \t\r\f\v]+", " ", line).strip()
                      for line in text.splitlines() if line.strip()).strip()
 
+def detail_author(soup: BeautifulSoup) -> str | None:
+    for header in soup.select("tr > th"):
+        if header.get_text(" ", strip=True) != "작성자":
+            continue
+        cell = header.find_next_sibling("td")
+        if cell:
+            return re.sub(r"\s+", " ", cell.get_text(" ", strip=True)).strip()[:100] or None
+    return None
+
 def parse_detail(html: str, listed: ListedNotice) -> ParsedNotice:
     soup = BeautifulSoup(html, "html.parser")
     body = soup.select_one("td.dragable, .bbsV_cont, .board_view_con, .view_cont")
@@ -112,6 +125,7 @@ def parse_detail(html: str, listed: ListedNotice) -> ParsedNotice:
     title = title_node.get_text(" ", strip=True) if title_node else listed.title
     if not title:
         raise ParseError("DETAIL_TITLE_MISSING")
+    author = detail_author(soup) or listed.author_name
     attachments, seen = [], set()
     for a in soup.select("ul.file a, .file_down a, .bbsV_file a"):
         name = a.get_text(" ", strip=True)
@@ -132,4 +146,4 @@ def parse_detail(html: str, listed: ListedNotice) -> ParsedNotice:
                "posted_date": listed.posted_date.isoformat(), "original_url": listed.original_url}
     fingerprint = hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     return ParsedNotice(listed.external_id, title, listed.posted_date, listed.original_url,
-        text, attachments, image_count > 0 and len(text) < 80, fingerprint)
+        text, attachments, image_count > 0 and len(text) < 80, fingerprint, author)

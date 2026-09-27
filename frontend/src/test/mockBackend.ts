@@ -8,7 +8,8 @@ export const interests: InterestDto[] = [
 ]
 export const password = 'test-password-123'
 export function notice(id = 1): NoticeCardDto {
-  return { id, title: `시험 공지 ${id}`, source_code: 'SCNU_SW', source_name: 'SW중심대학사업단', posted_date: '2026-09-20',
+  return { id, title: `시험 공지 ${id}`, source_code: 'SCNU_MAIN', source_name: '기타', author_name: '학생지원과',
+    publisher_category: 'other', posted_date: '2026-09-20',
     original_url: 'https://www.scnu.ac.kr/', category: id % 2 ? 'education' : 'contest', summary_lines: ['대상: 재학생', '활동: 교육', '일정: 원문 확인'],
     deadline_date: null, deadline_at: null, d_day: null, deadline_label: '마감 미정', is_closed: false,
     is_bookmarked: false, needs_review: false, recommendation: { score: 2, grade: 'low', reasons: ['학적 조건 일치'], breakdown: [], policy_version: '1' } }
@@ -32,7 +33,7 @@ export function mockBackend() {
   const notices = Array.from({ length: 23 }, (_, index) => notice(index + 1))
   const calendars = new Map<string, CalendarDto>()
   const detailAnalysis = new Map<number, { provider?: string; status: string; applicationMethod: string | null;
-    recruitmentText?: string | null; prizeDescription?: string | null }>()
+    targetText?: string | null; recruitmentText?: string | null; prizeDescription?: string | null }>()
   const errors = new Map<string, Response>()
   const fetcher = vi.fn(async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = new URL(String(input))
@@ -55,7 +56,7 @@ export function mockBackend() {
       return json({ access_token: `token-${body.username}`, token_type: 'bearer', expires_at: Date.now() / 1000 + 3600, user: found.account })
     }
     if (path === '/interests') return json(interests)
-    if (path === '/sources') return json([{ code: 'SCNU_SW', name: 'SW중심대학사업단', list_url: '', enabled: true, last_success_at: null }])
+    if (path === '/sources') return json([{ code: 'SCNU_MAIN', name: '순천대학교 대표 공지', list_url: '', enabled: true, last_success_at: null }])
     if (!user) return failure(401, 'INVALID_SESSION')
     if (path === '/auth/me') return json(user.account)
     if (path === '/auth/logout') return new Response(null, { status: 204 })
@@ -86,19 +87,18 @@ export function mockBackend() {
       const analysis = detailAnalysis.get(item.id)
       return json({ ...item, is_bookmarked: user.favorites.has(item.id), body_text: '시험 본문', attachments: [{ name: '자료', url: null }],
         content_hash: '', image_only: false, fetched_at: 1, analysis: { provider: analysis?.provider ?? 'rules', status: analysis?.status ?? 'reviewed', warnings: [], analyzed_at: 1, data: {
-          target_text: null, recruitment_text: analysis?.recruitmentText ?? null,
+          target_text: analysis?.targetText ?? null, recruitment_text: analysis?.recruitmentText ?? null,
           application_method: analysis?.applicationMethod ?? null, schedules: [],
           prize: analysis?.prizeDescription ? { status: 'present', description: analysis.prizeDescription, evidence: analysis.prizeDescription }
             : { status: 'not_stated', description: null, evidence: null },
           mileages: [{ system: '마일리지', points_text: '최대 10~20점', condition: null, evidence: '시험' }] } } })
     }
     const categories = url.searchParams.getAll('category')
+    const publisherCategory = url.searchParams.get('publisher_category')
     const query = url.searchParams.get('q') ?? ''
-    const successOnly = url.searchParams.get('analysis_success_only') === 'true'
     const all = notices.filter((item) => (path !== '/bookmarks' || user.favorites.has(item.id)) &&
-      (!successOnly || (detailAnalysis.get(item.id)?.provider === 'openai' &&
-        ['analyzed', 'needs_review'].includes(detailAnalysis.get(item.id)?.status ?? ''))) &&
-      (!categories.length || categories.includes(item.category)) && item.title.includes(query))
+      (!categories.length || categories.includes(item.category)) &&
+      (!publisherCategory || publisherCategory === item.publisher_category) && item.title.includes(query))
     const page = Number(url.searchParams.get('page') ?? 1)
     const size = Number(url.searchParams.get('page_size') ?? 20)
     return json({ items: all.slice((page - 1) * size, page * size).map((item) => ({ ...item, is_bookmarked: user.favorites.has(item.id) })),

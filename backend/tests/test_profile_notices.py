@@ -110,7 +110,8 @@ def test_interest_change_keeps_bookmarks_updates_recommendations(client,user_fac
     client.put("/api/profile",headers=headers,json={"department":"컴퓨터공학과","grade":2,
         "academic_status":"enrolled","interest_ids":["arts","volunteer"]})
     after=client.get("/api/notices/recommended",headers=headers).json()
-    assert after["total"] == 0
+    assert after["total"] == 1
+    assert after["items"][0]["recommendation"]["score"] == 10
     assert after["profile_version"] > before["profile_version"]
     assert client.get("/api/bookmarks",headers=headers).json()["total"] == 1
 
@@ -118,5 +119,28 @@ def test_invalid_optional_token_does_not_become_anonymous(client):
     r=client.get("/api/notices",headers={"Authorization":"Bearer invalid"})
     assert r.status_code == 401
 
-def test_only_three_source_codes_accepted(client):
+def test_only_representative_source_is_filterable(client):
     assert client.get("/api/notices?source=SCNU_GLOCAL").status_code == 422
+    assert client.get("/api/notices?source=SCNU_SW").status_code == 422
+
+
+def test_publisher_filter_uses_representative_author_before_pagination(client, app, user_factory, notice_factory):
+    headers, _ = user_factory()
+    first, second, third = (notice_factory() for _ in range(3))
+    with app.state.sessions() as db:
+        for ident, author, category in (
+            (first, "SW중심대학사업단", "sw_center"),
+            (second, "RISE사업단", "rise"),
+            (third, "대학일자리플러스센터", "other"),
+        ):
+            notice = db.get(Notice, ident)
+            notice.author_name, notice.publisher_category = author, category
+        db.commit()
+    for path in ("/api/notices", "/api/notices/new", "/api/notices/recommended"):
+        response = client.get(path, headers=headers, params={"publisher_category": "sw_center", "page_size": 1}).json()
+        assert response["total"] == 1
+        assert response["items"][0]["id"] == first
+        assert response["items"][0]["source_name"] == "SW중심대학사업단"
+        assert response["items"][0]["author_name"] == "SW중심대학사업단"
+    assert client.get(f"/api/notices/{second}").json()["publisher_category"] == "rise"
+    assert client.get("/api/notices", params={"publisher_category": "invalid"}).status_code == 422

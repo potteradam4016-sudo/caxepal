@@ -72,6 +72,7 @@
 | `migrations/script.py.mako` | DB 마이그레이션 |
 | `migrations/versions/0001_initial_backend_schema.py` | DB 마이그레이션 |
 | `migrations/versions/0002_username_auth.py` | DB 마이그레이션 |
+| `migrations/versions/0003_notice_author_category.py` | DB 마이그레이션 |
 | `pyproject.toml` | 구성 파일 |
 | `requirements-dev.txt` | 구성 파일 |
 | `requirements-postgres.txt` | 구성 파일 |

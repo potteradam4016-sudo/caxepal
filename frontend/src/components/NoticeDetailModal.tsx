@@ -37,11 +37,7 @@ export function NoticeDetailModal({ noticeId, onClose }: { noticeId: number; onC
           <section><b>마일리지</b>{notice.mileages.length ? notice.mileages.map((item, index) =>
             <p key={index}>{item.system}: {item.points_text ?? '점수 미기재'} ({item.condition ?? '조건 미기재'})</p>) : <p>미기재</p>}</section>
         </div>
-        <section><h3>신청·행사 일정</h3>{notice.schedules.length ? notice.schedules.map((schedule, index) =>
-          <p key={index}><b>{schedule.kind === 'application' ? '신청' : '행사'} · {schedule.label}</b><br />
-            {schedule.start_date ?? '시작일 미정'} {schedule.start_time ?? ''} ~ {schedule.end_date ?? '종료일 미정'} {schedule.end_time ?? ''}</p>) : <p>일정 미정</p>}</section>
         {notice.recommendation && <section className="detail-reason"><h3>추천 이유</h3>{notice.recommendation.reasons.map((reason, index) => <p key={index}>{reason}</p>)}</section>}
-        <section><h3>공지 내용</h3><p className="notice-body">{notice.body}</p></section>
         {!!notice.attachments.length && <section><h3>첨부파일</h3><ul>{notice.attachments.map((item, index) =>
           <li key={index}>{safeLink(item.url) ? <a href={safeLink(item.url)} target="_blank" rel="noreferrer">{item.name}</a> : item.name}</li>)}</ul></section>}
         <div className="modal-actions">

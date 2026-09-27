@@ -2,7 +2,7 @@ from datetime import timedelta
 from sqlalchemy import select
 from app.crawlers.parser import parse_detail, parse_list
 from app.models import CrawlRun, Notice, Source, now_ts
-from app.reference import list_url
+from app.reference import list_url, publisher_category
 from app.services.analysis import analyze, apply_analysis
 from app.services.dates import local_today
 
@@ -11,6 +11,8 @@ def upsert_notice(factory, settings, code, parsed, analyzer=analyze):
     with factory() as db:
         old = db.scalar(select(Notice).where(Notice.source_code==code, Notice.external_id==parsed.external_id))
         if old and old.content_hash == parsed.content_hash:
+            old.author_name = parsed.author_name
+            old.publisher_category = publisher_category(parsed.author_name)
             old.last_seen_at = now_ts()
             db.commit()
             return "unchanged"
@@ -23,6 +25,8 @@ def upsert_notice(factory, settings, code, parsed, analyzer=analyze):
             db.add(notice)
         for key in ("title", "body_text", "posted_date", "original_url", "attachments", "image_only", "content_hash"):
             setattr(notice, key, getattr(parsed, key))
+        notice.author_name = parsed.author_name
+        notice.publisher_category = publisher_category(parsed.author_name)
         notice.updated_at = notice.last_seen_at = now_ts()
         apply_analysis(notice, data, provider, status, warnings)
         db.commit()
@@ -31,6 +35,8 @@ def upsert_notice(factory, settings, code, parsed, analyzer=analyze):
 def crawl_source(factory, settings, client, code, options, job_id):
     counts = {"created":0, "updated":0, "unchanged":0, "skipped_old":0, "failed":0, "pages":0}
     errors = []
+    if code != "SCNU_MAIN":
+        return {"source": code, "status": "skipped", "counts": counts, "errors": ["SOURCE_DISABLED"]}
     with factory() as db:
         source = db.get(Source, code)
         if not source or not source.enabled:

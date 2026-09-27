@@ -7,7 +7,7 @@ def test_root_health_and_empty_database(client):
     assert client.get("/").status_code == 200
     assert client.get("/health").json()["database"] == "ok"
     assert client.get("/api/notices").json()["total"] == 0
-    assert {x["code"] for x in client.get("/api/sources").json()} == {"SCNU_MAIN", "SCNU_SW", "SCNU_AI"}
+    assert {x["code"] for x in client.get("/api/sources").json()} == {"SCNU_MAIN"}
 
 
 def test_register_login_and_hash(client, app):

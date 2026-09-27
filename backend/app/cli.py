@@ -4,13 +4,14 @@ import sys
 from pathlib import Path
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from app.config import BASE_DIR, get_settings
 from app.db import make_engine, session_factory
-from app.models import AuthSession, CrawlJob, Notice, NoticeAnalysis, RateBucket, User, now_ts
-from app.reference import seed_reference
-from app.schemas import CrawlInput
-from app.services.analysis import analyze, apply_analysis, extract_rules
+from app.models import AuthSession, Bookmark, CrawlJob, Notice, NoticeAnalysis, RateBucket, User, now_ts
+from app.reference import publisher_category, seed_reference
+from app.schemas import AnalysisData, CrawlInput
+from app.services.analysis import analyze, apply_analysis, clean_summary_lines, extract_rules, schedule_evidence_text
+from app.services.dates import deadline_values, has_date_expression
 from app.services.jobs import enqueue, run_next_job
 
 def migrate(settings):
@@ -30,6 +31,17 @@ def migrate(settings):
         seed_reference(db)
     engine.dispose()
 
+def purge_legacy_notices(db, apply=False):
+    legacy = ("SCNU_SW", "SCNU_AI")
+    notice_count = db.scalar(select(func.count()).select_from(Notice)
+        .where(Notice.source_code.in_(legacy)))
+    bookmark_count = db.scalar(select(func.count()).select_from(Bookmark).join(Notice)
+        .where(Notice.source_code.in_(legacy)))
+    if apply:
+        db.execute(delete(Notice).where(Notice.source_code.in_(legacy)))
+        db.commit()
+    return notice_count, bookmark_count
+
 def main():
     parser = argparse.ArgumentParser(description="SCNU PICK 백엔드 관리 명령 (실행 서버 접근 권한 필요)")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -38,11 +50,15 @@ def main():
     admin.add_argument("--username", required=True)
     admin.add_argument("--revoke", action="store_true")
     crawl = sub.add_parser("crawl")
-    crawl.add_argument("--source", choices=["all","SCNU_MAIN","SCNU_SW","SCNU_AI"], default="all")
+    crawl.add_argument("--source", choices=["SCNU_MAIN"], default="SCNU_MAIN")
     crawl.add_argument("--pages", type=int, default=1)
     crawl.add_argument("--max-notices", type=int, default=5)
     crawl.add_argument("--max-age-days", type=int, default=60)
     sub.add_parser("cleanup")
+    purge_legacy = sub.add_parser("purge-legacy-notices")
+    purge_legacy.add_argument("--apply", action="store_true")
+    author_refresh = sub.add_parser("refresh-authors")
+    author_refresh.add_argument("--limit", type=int, default=100)
     purge = sub.add_parser("purge-gemini-analyses")
     purge.add_argument("--include-failed-fallbacks", action="store_true")
     export = sub.add_parser("export-openapi")
@@ -53,6 +69,10 @@ def main():
     reanalyze.add_argument("--include-reviewed", action="store_true")
     reanalyze.add_argument("--failed-only", action="store_true")
     reanalyze.add_argument("--refresh-fallback", action="store_true")
+    schedule_refresh = sub.add_parser("refresh-schedules")
+    schedule_refresh.add_argument("--notice-id", type=int)
+    schedule_refresh.add_argument("--limit", type=int, default=100)
+    schedule_refresh.add_argument("--apply", action="store_true")
     args = parser.parse_args()
     settings = get_settings()
     if args.command == "init-db":
@@ -82,7 +102,7 @@ def main():
         elif args.command == "crawl":
             if not settings.crawl_enabled:
                 parser.error("허가받은 수집 조건을 반영한 뒤 backend/.env에서 CRAWL_ENABLED=true로 설정하세요.")
-            options = CrawlInput(sources=["SCNU_MAIN","SCNU_SW","SCNU_AI"] if args.source=="all" else [args.source],
+            options = CrawlInput(sources=[args.source],
                 pages=args.pages, max_notices=args.max_notices, max_age_days=args.max_age_days)
             with factory() as db:
                 job = enqueue(db, options)
@@ -101,6 +121,42 @@ def main():
                     db.execute(delete(model).where(model.expires_at < now_ts()))
                 db.commit()
             print("만료된 세션·요청 제한 기록을 정리했습니다.")
+        elif args.command == "purge-legacy-notices":
+            with factory() as db:
+                notice_count, bookmark_count = purge_legacy_notices(db, args.apply)
+            action = "삭제" if args.apply else "삭제 예정"
+            print(f"별도 게시판 공지 {notice_count}건, 연결된 찜 {bookmark_count}건 {action}."
+                  + ("" if args.apply else " 실제 삭제는 --apply를 붙이세요."))
+        elif args.command == "refresh-authors":
+            if not 1 <= args.limit <= 1000:
+                parser.error("--limit은 1~1000 범위여야 합니다.")
+            from app.crawlers.client import SafeClient
+            from app.crawlers.parser import detail_author
+            from bs4 import BeautifulSoup
+            with factory() as db:
+                notices = db.execute(select(Notice.id, Notice.original_url)
+                    .where(Notice.source_code == "SCNU_MAIN", Notice.author_name.is_(None))
+                    .order_by(Notice.id).limit(args.limit)).all()
+            updated = failed = 0
+            with SafeClient(settings) as client:
+                client.prepare_robots()
+                for notice_id, url in notices:
+                    try:
+                        soup = BeautifulSoup(client.get_html(url), "html.parser")
+                        author = detail_author(soup)
+                        if not author:
+                            failed += 1
+                            continue
+                        with factory() as db:
+                            notice = db.get(Notice, notice_id)
+                            if notice and notice.source_code == "SCNU_MAIN":
+                                notice.author_name = author[:100]
+                                notice.publisher_category = publisher_category(author)
+                                db.commit()
+                                updated += 1
+                    except Exception:
+                        failed += 1
+            print(f"대표 공지 작성자 {updated}건 갱신, {failed}건 실패. AI 재분석은 하지 않았습니다.")
         elif args.command == "purge-gemini-analyses":
             with factory() as db:
                 target = NoticeAnalysis.provider == "gemini"
@@ -114,6 +170,48 @@ def main():
                     apply_analysis(notice, data, "rules", "needs_review", warnings)
                 db.commit()
             print(f"Gemini 분석 {len(notices)}건을 규칙 분석으로 교체했습니다. 공지와 찜은 유지했습니다.")
+        elif args.command == "refresh-schedules":
+            if not 1 <= args.limit <= 1000:
+                parser.error("--limit은 1~1000 범위여야 합니다.")
+            with factory() as db:
+                query = select(Notice.id).order_by(Notice.id).limit(args.limit)
+                if args.notice_id is not None:
+                    query = query.where(Notice.id == args.notice_id)
+                ids = db.scalars(query).all()
+            updated = reviewed = 0
+            for ident in ids:
+                with factory() as db:
+                    notice = db.get(Notice, ident, with_for_update=args.apply)
+                    if not notice or not notice.analysis:
+                        continue
+                    analysis = notice.analysis
+                    if analysis.provider == "manual":
+                        reviewed += 1
+                        continue
+                    current = AnalysisData.model_validate(analysis.data)
+                    fresh, _ = extract_rules(notice.title, notice.body_text, notice.image_only)
+                    old_dates = sum(int(s.start_date is not None) + int(s.end_date is not None)
+                                    for s in current.schedules)
+                    new_dates = sum(int(s.start_date is not None) + int(s.end_date is not None)
+                                    for s in fresh.schedules)
+                    empty_heading = any(not has_date_expression(s.evidence) for s in current.schedules)
+                    if new_dates <= old_dates and not empty_heading:
+                        continue
+                    current.schedules = fresh.schedules
+                    current.summary_lines[2] = clean_summary_lines([
+                        current.summary_lines[0], current.summary_lines[1],
+                        f"일정: {schedule_evidence_text(current.schedules)}",
+                    ])[2]
+                    if args.apply:
+                        analysis.data = current.model_dump(mode="json")
+                        analysis.deadline_date, analysis.deadline_at = deadline_values(current.schedules)
+                        notice.search_text = "\n".join([
+                            notice.title, notice.body_text, *current.summary_lines, *current.tags])
+                        db.commit()
+                    updated += 1
+            action = "갱신" if args.apply else "갱신 예정"
+            print(f"공지 일정 {updated}건 {action}, 관리자 검수 {reviewed}건 보존. AI는 호출하지 않았습니다."
+                  + ("" if args.apply else " 실제 반영은 --apply를 붙이세요."))
         elif args.command == "reanalyze":
             if not 1 <= args.limit <= 1000:
                 parser.error("--limit은 1~1000 범위여야 합니다.")

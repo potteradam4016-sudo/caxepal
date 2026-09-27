@@ -4,10 +4,23 @@ from app.models import Interest, Source
 from app.db import dialect_insert
 
 SOURCES = {
-    "SCNU_MAIN": {"name": "순천대학교 대표 공지", "site": "SCNU", "mi": "1131", "bbs_id": "1040"},
-    "SCNU_SW": {"name": "SW중심대학사업단", "site": "scnusw", "mi": "8889", "bbs_id": "4548"},
-    "SCNU_AI": {"name": "AI인재양성부트캠프사업단", "site": "scnuai", "mi": "10241", "bbs_id": "5045"},
+    "SCNU_MAIN": {"name": "순천대학교 대표 공지", "site": "SCNU", "mi": "1131", "bbs_id": "1040", "active": True},
+    "SCNU_SW": {"name": "SW중심대학사업단", "site": "scnusw", "mi": "8889", "bbs_id": "4548", "active": False},
+    "SCNU_AI": {"name": "AI인재양성부트캠프사업단", "site": "scnuai", "mi": "10241", "bbs_id": "5045", "active": False},
 }
+PUBLISHER_CATEGORIES = {
+    "sw_center": "SW중심대학사업단",
+    "ai_bootcamp": "AI인재양성부트캠프사업단",
+    "rise": "RISE사업단",
+    "industry_education": "산학협력교육센터",
+    "gwangyang": "첨단소재광양캠퍼스",
+    "other": "기타",
+}
+
+def publisher_category(author_name: str | None) -> str:
+    author = "".join((author_name or "").split()).casefold()
+    return next((code for code, name in PUBLISHER_CATEGORIES.items()
+                 if author == "".join(name.split()).casefold()), "other")
 INTERESTS = [
     ("ai_sw", "AI·SW", "field", ["인공지능", "소프트웨어", "프로그래밍", "코딩", "AI", "SW", "OSS"]),
     ("data", "데이터", "field", ["데이터", "빅데이터", "통계"]),
@@ -45,7 +58,8 @@ def detail_url(code: str, external_id: str) -> str:
 def seed_reference(db):
     for code, item in SOURCES.items():
         db.execute(dialect_insert(db, Source).values(code=code, name=item["name"],
-            list_url=list_url(code), enabled=True).on_conflict_do_nothing(index_elements=["code"]))
+            list_url=list_url(code), enabled=item["active"]).on_conflict_do_update(
+                index_elements=["code"], set_={"enabled": item["active"]}))
     for ident, name, kind, keywords in INTERESTS:
         db.execute(dialect_insert(db, Interest).values(id=ident, name=name, type=kind,
             keywords=keywords).on_conflict_do_nothing(index_elements=["id"]))

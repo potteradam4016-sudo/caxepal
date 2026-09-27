@@ -4,7 +4,7 @@
 기존 `frontend/`, 루트 `docs/`, `.github/` 파일을 덮어쓰지 않습니다.
 
 > 이 구현의 기능 기준은 첨부 저장소 `docs/product-scope.md`입니다.
-> 추천 / 신규 / **찜 기반 월간 캘린더**, 아이디·비밀번호 인증, 세 가지 수집 출처를 반영했습니다.
+> 추천 / 신규 / **찜 기반 월간 캘린더**, 아이디·비밀번호 인증, 대표 게시판 단일 수집과 작성자 분류를 반영했습니다.
 > 과거 기획서의 네 번째 출처·별도 마감 메뉴·Supabase Auth를 그대로 가져온 버전이 아닙니다.
 > API 경로·관심사 사전·추천 가중치·인증 방식·운영 서비스는 **구현 제안값**이며 팀 합의가 필요합니다.
 
@@ -75,6 +75,9 @@ OpenAI 분석을 켜려면 `backend/.env`에서 기존 `AI_PROVIDER=gemini`를
 `AI_PROVIDER=openai`로 바꾸고 `OPENAI_API_KEY`와 `OPENAI_MODEL=gpt-5.6-sol`을 설정합니다.
 기존 `GEMINI_API_KEY`·`GEMINI_MODEL`은 사용하지 않습니다. 키는 프론트에 넣거나 커밋하지 않습니다.
 설정 변경 후 API와 worker를 모두 재시작해야 새 설정이 적용됩니다.
+기존 공지의 날짜 없는 일정 제목을 정리하고 본문 날짜를 다시 반영하려면
+`.venv\Scripts\python.exe -m app.cli refresh-schedules --limit 100`으로 대상을 확인한 뒤
+`--apply`를 붙여 실행합니다. AI 호출 없이 일정만 갱신하며 관리자 검수 결과는 보존합니다.
 기존 Gemini 분석 결과만 지우고 원문 기반 규칙 결과로 교체하려면 worker를 멈춘 뒤
 `.venv\Scripts\python.exe -m app.cli purge-gemini-analyses`를 실행합니다. 공지·찜은 유지됩니다.
 이전 Gemini 호출에서 실패해 `rules_fallback`으로 저장된 결과도 정리하려면

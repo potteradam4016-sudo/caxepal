@@ -62,6 +62,8 @@ class Notice(Base):
     __tablename__ = "notices"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source_code: Mapped[str] = mapped_column(ForeignKey("sources.code"))
+    author_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    publisher_category: Mapped[str] = mapped_column(String(32), default="other", index=True)
     external_id: Mapped[str] = mapped_column(String(32))
     title: Mapped[str] = mapped_column(String(1000))
     body_text: Mapped[str] = mapped_column(Text)

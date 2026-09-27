@@ -115,7 +115,7 @@ ID를 화면 코드에 임의 생성하지 말고 API 응답을 사용합니다.
 
 | 경로 | 인증 | 의미 |
 | --- | --- | --- |
-| `GET /api/sources` | 불필요 | 출처 세 곳과 마지막 성공 시각 |
+| `GET /api/sources` | 불필요 | 대표 게시판과 마지막 성공 시각 |
 | `GET /api/notices` | 선택 | 전체 수집 공지의 검색·필터 |
 | `GET /api/notices/new` | 선택 | 원문 등록일 최신순 목록 |
 | `GET /api/notices/recommended` | 필수 | 온보딩 완료 사용자의 맞춤 추천 |
@@ -129,7 +129,8 @@ ID를 화면 코드에 임의 생성하지 말고 API 응답을 사용합니다.
 
 | 파라미터 | 범위/기본값 | 비고 |
 | --- | --- | --- |
-| `source` | 생략 또는 `SCNU_MAIN / SCNU_SW / SCNU_AI` | 글로컬 미지원 |
+| `source` | 생략 또는 `SCNU_MAIN` | 대표 게시판만 조회 |
+| `publisher_category` | 아래 6종 중 하나 | 원문 작성자 기준 출처 분류 |
 | `category` | 아래 enum | 반복 쿼리로 복수 선택, OR 조건 |
 | `q` | 최대 100자 | 제목·본문·요약·태그의 문자 검색 |
 | `closing_days` | 0~90, 생략 시 마감 필터 없음 | 오늘부터 N일 뒤까지; 미정·지난 마감 제외 |
@@ -154,6 +155,8 @@ ID를 화면 코드에 임의 생성하지 말고 API 응답을 사용합니다.
 `contest`, `education`, `scholarship`, `career`, `startup`, `overseas`, `volunteer`, `other`.
 
 `category=education&category=contest`는 두 분류의 합집합입니다. 단일 값도 지원합니다.
+작성자 출처 분류는 `sw_center`, `ai_bootcamp`, `rise`, `industry_education`, `gwangyang`, `other`입니다.
+알려진 다섯 작성자 외에는 `other`로 분류하며 내용 카테고리와 독립적으로 필터링합니다.
 필터는 전체 개수 계산, 추천 정렬과 페이지 분할 전에 적용됩니다.
 
 목록 응답:
@@ -169,7 +172,7 @@ ID를 화면 코드에 임의 생성하지 말고 API 응답을 사용합니다.
 ```
 
 추천 응답에는 계산에 사용한 `profile_version`이 들어갑니다.
-목록 카드에는 `id`, `title`, `source_code`, `source_name`, `posted_date`, `original_url`,
+목록 카드에는 `id`, `title`, `source_code`, `source_name`, `author_name`, `publisher_category`, `posted_date`, `original_url`,
 `category`, `summary_lines`, `deadline_date`, `deadline_at`, `d_day`, `deadline_label`,
 `is_closed`, `is_bookmarked`, `needs_review`, `recommendation`이 있습니다.
 
@@ -256,7 +259,7 @@ AI 응답의 confidence는 교정된 정확도 지표가 아닙니다.
 
 ```json
 {
-  "sources": ["SCNU_MAIN","SCNU_SW","SCNU_AI"],
+  "sources": ["SCNU_MAIN"],
   "pages": 1,
   "max_notices": 5,
   "max_age_days": 60

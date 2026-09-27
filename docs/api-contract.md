@@ -38,7 +38,7 @@
 - PUT에는 `department, grade, academic_status, interest_ids, expected_version`을 보냅니다.
 - 학적 단계에서는 빈 관심사 목록으로 저장하고, 최종 단계에서 전체 프로필을 저장합니다.
 - `category=education&category=contest`처럼 반복 쿼리를 보내 OR 필터를 적용합니다. 단일 값 요청도 지원합니다.
-- 출처 `source`, 검색 `q`(100자 이하), 마감 `closing_days=7`을 조합합니다.
+- 대표 게시판 작성자 분류 `publisher_category`, 검색 `q`(100자 이하), 마감 `closing_days=7`을 조합합니다.
 - 응답의 `total/page/page_size`를 사용하며 UI는 20개씩 표시합니다.
 - 카드의 3줄 요약과 상세 데이터를 분리합니다. 서버 점수·추천 이유·정렬을 재계산하지 않습니다.
 

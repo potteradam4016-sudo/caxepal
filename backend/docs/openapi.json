@@ -1321,11 +1321,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "enum": [
-                    "SCNU_MAIN",
-                    "SCNU_SW",
-                    "SCNU_AI"
-                  ],
+                  "const": "SCNU_MAIN",
                   "type": "string"
                 },
                 {
@@ -1333,6 +1329,30 @@
                 }
               ],
               "title": "Source"
+            }
+          },
+          {
+            "name": "publisher_category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "sw_center",
+                    "ai_bootcamp",
+                    "rise",
+                    "industry_education",
+                    "gwangyang",
+                    "other"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Publisher Category"
             }
           },
           {
@@ -1580,11 +1600,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "enum": [
-                    "SCNU_MAIN",
-                    "SCNU_SW",
-                    "SCNU_AI"
-                  ],
+                  "const": "SCNU_MAIN",
                   "type": "string"
                 },
                 {
@@ -1592,6 +1608,30 @@
                 }
               ],
               "title": "Source"
+            }
+          },
+          {
+            "name": "publisher_category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "sw_center",
+                    "ai_bootcamp",
+                    "rise",
+                    "industry_education",
+                    "gwangyang",
+                    "other"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Publisher Category"
             }
           },
           {
@@ -1835,11 +1875,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "enum": [
-                    "SCNU_MAIN",
-                    "SCNU_SW",
-                    "SCNU_AI"
-                  ],
+                  "const": "SCNU_MAIN",
                   "type": "string"
                 },
                 {
@@ -1847,6 +1883,30 @@
                 }
               ],
               "title": "Source"
+            }
+          },
+          {
+            "name": "publisher_category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "sw_center",
+                    "ai_bootcamp",
+                    "rise",
+                    "industry_education",
+                    "gwangyang",
+                    "other"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Publisher Category"
             }
           },
           {
@@ -4015,30 +4075,26 @@
           "sources": {
             "items": {
               "type": "string",
-              "enum": [
-                "SCNU_MAIN",
-                "SCNU_SW",
-                "SCNU_AI"
-              ]
+              "const": "SCNU_MAIN"
             },
             "type": "array",
-            "maxItems": 3,
+            "maxItems": 1,
             "minItems": 1,
             "title": "Sources"
           },
           "pages": {
             "type": "integer",
-            "maximum": 3.0,
+            "maximum": 5.0,
             "minimum": 1.0,
             "title": "Pages",
             "default": 1
           },
           "max_notices": {
             "type": "integer",
-            "maximum": 50.0,
+            "maximum": 40.0,
             "minimum": 1.0,
             "title": "Max Notices",
-            "default": 20
+            "default": 40
           },
           "max_age_days": {
             "type": "integer",
@@ -4385,6 +4441,29 @@
             "type": "string",
             "title": "Source Name"
           },
+          "author_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Name"
+          },
+          "publisher_category": {
+            "type": "string",
+            "enum": [
+              "sw_center",
+              "ai_bootcamp",
+              "rise",
+              "industry_education",
+              "gwangyang",
+              "other"
+            ],
+            "title": "Publisher Category"
+          },
           "posted_date": {
             "type": "string",
             "format": "date",
@@ -4472,6 +4551,8 @@
           "title",
           "source_code",
           "source_name",
+          "author_name",
+          "publisher_category",
           "posted_date",
           "original_url",
           "category",
@@ -4509,6 +4590,29 @@
           "source_name": {
             "type": "string",
             "title": "Source Name"
+          },
+          "author_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author Name"
+          },
+          "publisher_category": {
+            "type": "string",
+            "enum": [
+              "sw_center",
+              "ai_bootcamp",
+              "rise",
+              "industry_education",
+              "gwangyang",
+              "other"
+            ],
+            "title": "Publisher Category"
           },
           "posted_date": {
             "type": "string",
@@ -4623,6 +4727,8 @@
           "title",
           "source_code",
           "source_name",
+          "author_name",
+          "publisher_category",
           "posted_date",
           "original_url",
           "category",

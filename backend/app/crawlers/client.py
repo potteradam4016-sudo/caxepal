@@ -19,7 +19,7 @@ class SafeClient:
             trust_env=False, transport=transport, headers={"User-Agent": settings.crawl_user_agent,
                                                           "Accept": "text/html,text/plain"})
         self.paths = {"/robots.txt"} | {
-            f"/{s['site']}/na/ntt/{page}" for s in SOURCES.values()
+            f"/{s['site']}/na/ntt/{page}" for s in SOURCES.values() if s["active"]
             for page in ("selectNttList.do", "selectNttInfo.do")
         }
 

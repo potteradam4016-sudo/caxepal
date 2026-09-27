@@ -1,4 +1,5 @@
 import json
+import copy
 from datetime import date
 import httpx
 import pytest
@@ -10,6 +11,7 @@ from app.models import AuditLog, Notice, User
 from app.schemas import AnalysisData
 from app.services import analysis as module
 from app.services.analysis import extract_rules, validate_grounding
+from app.services.dates import dates_in_text
 from app.services.recommendations import load_policy, score_notice
 from tests.conftest import PASSWORD
 
@@ -63,7 +65,51 @@ def test_rule_fallback_handles_spaced_method_and_one_sided_deadline():
     assert data.schedules[0].start_date is None
     assert data.schedules[0].end_date == date(2026, 9, 15)
     abbreviated, _ = extract_rules("교육", "신청기간: 2026. 9. 21. ~ 10. 8.까지")
-    assert not any(item.end_date for item in abbreviated.schedules)
+    assert abbreviated.schedules[0].start_date == date(2026, 9, 21)
+    assert abbreviated.schedules[0].end_date == date(2026, 10, 8)
+
+
+def test_schedule_heading_without_dates_is_not_a_schedule():
+    body = "○ 대회 일정\n참가 안내는 추후 공지합니다."
+    data, _ = extract_rules("해커톤", body)
+    assert data.schedules == []
+    assert data.summary_lines[2] == "일정: 일정 미정 · 원문 확인"
+
+
+def test_event_date_and_flattened_schedule_table_are_extracted():
+    body = ("○ 일시 : 2026. 10. 29.( 목 ) ~ 10. 30.( 금 )\n"
+            "○ 모집기간 : 2026. 9. 16.( 수 ) ~ 9. 28.( 월 ) 17:00 까지\n"
+            "○ 대회 일정\n사전 온라인 교육 | → | 팀 빌딩 | → | 해커톤\n"
+            "'26.10.12. ~ 10.18. | '26.10.19. ~ 10.21. | '26.10.29. ~ 10.30.")
+    data, _ = extract_rules("해커톤 참가 안내", body)
+    assert [(s.kind, s.start_date, s.end_date) for s in data.schedules] == [
+        ("event", date(2026, 10, 29), date(2026, 10, 30)),
+        ("application", date(2026, 9, 16), date(2026, 9, 28)),
+        ("event", date(2026, 10, 12), date(2026, 10, 18)),
+        ("event", date(2026, 10, 19), date(2026, 10, 21)),
+        ("event", date(2026, 10, 29), date(2026, 10, 30)),
+    ]
+    assert "대회 일정" not in data.summary_lines[2]
+    assert "'26.10.12. ~ 10.18." in data.summary_lines[2]
+    assert validate_grounding(data, "해커톤 참가 안내", body).schedules == data.schedules
+
+
+def test_abbreviated_year_needs_explicit_year_and_same_line_range():
+    assert dates_in_text("행사: 10. 29. ~ 10. 30.") == []
+    assert dates_in_text("행사: 2026. 12. 31. ~ 1. 1.") == [(date(2026, 12, 31), None)]
+    data, _ = extract_rules("행사", "행사 일정: 9월 29일(화)까지")
+    assert data.schedules[0].start_date is None
+    assert "9월 29일" in data.summary_lines[2]
+
+
+def test_ai_schedule_cannot_use_heading_only_as_evidence():
+    body = "○ 대회 일정\n○ 일시: 2026.10.29."
+    data, _ = extract_rules("대회", body)
+    data.schedules[0].evidence = "○ 대회 일정"
+    data.schedules[0].start_date = None
+    data.schedules[0].end_date = None
+    with pytest.raises(ValueError, match="no date expression"):
+        validate_grounding(data, "대회", body)
 
 
 def test_recruitment_and_flattened_award_table_keep_literal_evidence():
@@ -152,12 +198,69 @@ def test_openai_uses_structured_output_and_server_side_key(settings):
         assert output["type"] == "json_schema" and output["strict"] is True
         assert output["schema"]["additionalProperties"] is False
         assert set(output["schema"]["properties"]) == set(output["schema"]["required"])
+        assert "schedules" in output["schema"]["properties"]
+        schedule_schema = output["schema"]["properties"]["schedules"]["items"]
+        assert set(schedule_schema["properties"]) == set(schedule_schema["required"])
         values = expected.model_dump(mode="json")
         return httpx.Response(200, json=openai_response({name: values[name]
             for name in module.openai_schema()["properties"]}))
 
     result = module.openai_extract(settings, title, body, httpx.MockTransport(handler))
     assert result.summary_lines == expected.summary_lines
+
+
+def test_openai_schedule_output_overrides_rule_schedule(settings):
+    title = "행사 안내"
+    body = "신청 마감: 2026.09.30\n행사 일정: 2026.10.01"
+    expected, _ = extract_rules(title, body)
+    values = expected.model_dump(mode="json")
+    output = {name: values[name] for name in module.openai_schema()["properties"]}
+    output["schedules"] = [values["schedules"][1]]
+    output["schedules"][0]["label"] = "AI 행사 일정"
+    transport = httpx.MockTransport(lambda _request: httpx.Response(200, json=openai_response(output)))
+    result = module.openai_extract(settings, title, body, transport)
+    assert len(result.schedules) == 2
+    assert result.schedules[0].kind == "event"
+    assert result.schedules[0].label == "AI 행사 일정"
+    assert result.schedules[1].kind == "application"
+    assert "2026.10.01" in result.summary_lines[2]
+
+
+def test_refresh_schedules_preserves_ai_and_manual_review(
+        client, app, settings, notice_factory, monkeypatch, capsys):
+    from app import cli
+
+    body = "○ 대회 일정\n○ 일시: 2026.10.29."
+    ai_id = notice_factory(body=body)
+    manual_id = notice_factory(body=body, title="다른 대회")
+    for ident, provider, status in [(ai_id, "openai", "analyzed"),
+                                    (manual_id, "manual", "reviewed")]:
+        with app.state.sessions() as db:
+            analysis = db.get(Notice, ident).analysis
+            data = copy.deepcopy(analysis.data)
+            data["schedules"] = [{"kind": "event", "label": "행사 일정",
+                "start_date": None, "end_date": None, "start_time": None, "end_time": None,
+                "evidence": "○ 대회 일정"}]
+            data["summary_lines"][2] = "일정: 대회 일정"
+            analysis.data = data
+            analysis.provider, analysis.status = provider, status
+            db.commit()
+    monkeypatch.setattr(cli, "get_settings", lambda: settings)
+    monkeypatch.setattr(cli, "analyze", lambda *_: pytest.fail("AI must not be called"))
+    monkeypatch.setattr(sys, "argv", ["app.cli", "refresh-schedules"])
+    cli.main()
+    assert "1건 갱신 예정, 관리자 검수 1건 보존" in capsys.readouterr().out
+    assert client.get(f"/api/notices/{ai_id}").json()["summary_lines"][2] == "일정: 대회 일정"
+    monkeypatch.setattr(sys, "argv", ["app.cli", "refresh-schedules", "--apply"])
+    cli.main()
+    assert "1건 갱신, 관리자 검수 1건 보존" in capsys.readouterr().out
+    ai = client.get(f"/api/notices/{ai_id}").json()
+    manual = client.get(f"/api/notices/{manual_id}").json()
+    assert ai["summary_lines"][2] == "일정: 2026.10.29."
+    assert ai["analysis"]["provider"] == "openai"
+    assert ai["analysis"]["status"] == "analyzed"
+    assert ai["analysis"]["data"]["schedules"][0]["start_date"] == "2026-10-29"
+    assert manual["summary_lines"][2] == "일정: 대회 일정"
 
 @pytest.mark.parametrize("status,code,retryable", [
     (400, "AI_REQUEST_ERROR", False), (404, "AI_MODEL_ERROR", False),
@@ -407,7 +510,8 @@ def test_recommendation_score_independent_of_dates():
     b,_=extract_rules("AI 해커톤","대상: 컴퓨터공학과 2학년 재학생\n신청 마감: 2070.09.30")
     profile={"department":"컴퓨터공학과","grade":2,"academic_status":"enrolled","interests":[
         {"id":"ai_sw","name":"AI·SW","type":"field"},{"id":"hackathon","name":"해커톤","type":"activity"}]}
-    assert score_notice(a,profile,load_policy())==score_notice(b,profile,load_policy())
+    assert score_notice(a,profile,load_policy(),title="AI 해커톤",body_text="대상: 컴퓨터공학과 2학년 재학생\n신청 마감: 2026.09.30")==score_notice(
+        b,profile,load_policy(),title="AI 해커톤",body_text="대상: 컴퓨터공학과 2학년 재학생\n신청 마감: 2070.09.30")
 
 def test_unknown_eligibility_does_not_earn_match_points():
     data,_=extract_rules("AI 해커톤","프로그램에 참여해주세요.")
@@ -551,4 +655,4 @@ def test_ai_summary_cannot_invent_freeform_benefit():
     data, _ = extract_rules("교육 안내", body)
     data.summary_lines[1] = "활동: 참가자 전원에게 상금 100만원 지급"
     checked = validate_grounding(data, "교육 안내", body)
-    assert checked.summary_lines[1] == "활동: 교육 안내"
+    assert checked.summary_lines[1] == "내용: 교육 안내"

@@ -44,7 +44,7 @@ def main():
                     kind="event", label="시험 행사", start_date=today,
                     end_date=today + timedelta(days=2), start_time=None, end_time=None, evidence=body)]
                 data = data.model_copy(update={"category": "education" if index % 2 else "contest", "schedules": schedules})
-                item = Notice(source_code="SCNU_SW", external_id=str(index), title=title, body_text=body,
+                item = Notice(source_code="SCNU_MAIN", external_id=str(index), title=title, body_text=body,
                     posted_date=today, original_url=f"https://www.scnu.ac.kr/?test={index}",
                     content_hash=hashlib.sha256((title + body).encode()).hexdigest(),
                     attachments=[], image_only=False)

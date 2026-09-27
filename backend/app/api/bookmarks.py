@@ -14,13 +14,15 @@ router = APIRouter(tags=["찜·캘린더"])
 @router.get("/bookmarks", summary="본인이 찜한 공지 목록", response_model=NoticePage)
 def bookmarks(page: int = Query(1, ge=1, le=100000), page_size: int = Query(20, ge=1, le=100),
               principal=Depends(current_principal), db=Depends(get_db)):
-    stmt = select(Notice).join(Bookmark).where(Bookmark.user_id == principal.user.id).order_by(
+    stmt = select(Notice).join(Bookmark).where(Bookmark.user_id == principal.user.id,
+                                                 Notice.source_code == "SCNU_MAIN").order_by(
         Bookmark.created_at.desc(), Notice.id.desc())
     return paginate(db, stmt, page, page_size, bookmarked_ids(db, principal.user.id))
 
 @router.post("/bookmarks/{notice_id}", summary="공지 찜하기", status_code=204)
 def add_bookmark(notice_id: int, principal=Depends(current_principal), db=Depends(get_db)):
-    if not db.get(Notice, notice_id):
+    notice = db.get(Notice, notice_id)
+    if not notice or notice.source_code != "SCNU_MAIN":
         raise APIError(404, "NOTICE_NOT_FOUND", "공지를 찾을 수 없습니다.")
     db.execute(dialect_insert(db, Bookmark).values(user_id=principal.user.id, notice_id=notice_id)
                .on_conflict_do_nothing(index_elements=["user_id", "notice_id"]))
@@ -40,7 +42,8 @@ def calendar(month: str = Query(pattern=r"^\d{4}-(0[1-9]|1[0-2])$"),
     if not 1900 <= year <= 2200:
         raise APIError(422, "INVALID_MONTH", "연도는 1900~2200 범위여야 합니다.")
     first, last = date(year, m, 1), date(year, m, cal.monthrange(year, m)[1])
-    notices = db.scalars(select(Notice).join(Bookmark).where(Bookmark.user_id == principal.user.id)
+    notices = db.scalars(select(Notice).join(Bookmark).where(Bookmark.user_id == principal.user.id,
+                                                              Notice.source_code == "SCNU_MAIN")
                         .order_by(Notice.id)).all()
     events, undated = [], []
     for notice in notices:
