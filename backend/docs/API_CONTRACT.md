@@ -115,7 +115,7 @@ ID를 화면 코드에 임의 생성하지 말고 API 응답을 사용합니다.
 
 | 경로 | 인증 | 의미 |
 | --- | --- | --- |
-| `GET /api/sources` | 불필요 | 출처 세 곳과 마지막 성공 시각 |
+| `GET /api/sources` | 불필요 | 대표 게시판과 마지막 성공 시각 |
 | `GET /api/notices` | 선택 | 전체 수집 공지의 검색·필터 |
 | `GET /api/notices/new` | 선택 | 원문 등록일 최신순 목록 |
 | `GET /api/notices/recommended` | 필수 | 온보딩 완료 사용자의 맞춤 추천 |
@@ -129,7 +129,8 @@ ID를 화면 코드에 임의 생성하지 말고 API 응답을 사용합니다.
 
 | 파라미터 | 범위/기본값 | 비고 |
 | --- | --- | --- |
-| `source` | 생략 또는 `SCNU_MAIN / SCNU_SW / SCNU_AI` | 글로컬 미지원 |
+| `source` | 생략 또는 `SCNU_MAIN` | 대표 게시판만 조회 |
+| `publisher_category` | 아래 6종 중 하나 | 원문 작성자 기준 출처 분류 |
 | `category` | 아래 enum | 반복 쿼리로 복수 선택, OR 조건 |
 | `q` | 최대 100자 | 제목·본문·요약·태그의 문자 검색 |
 | `closing_days` | 0~90, 생략 시 마감 필터 없음 | 오늘부터 N일 뒤까지; 미정·지난 마감 제외 |
@@ -143,6 +144,7 @@ ID를 화면 코드에 임의 생성하지 말고 API 응답을 사용합니다.
 신규 목록 자체는 신청 상태와 별개로 원문 등록일 내림차순입니다.
 
 `/recommended`는 `min_score`(0~100)를 추가로 받습니다.
+개발 중 분석 결과 확인용 `analysis_success_only=true`는 `provider=openai`이고 `status`가 `analyzed` 또는 `needs_review`인 공지만 반환합니다. `manual/reviewed`와 규칙 분석 결과는 제외합니다. 정확성 검수 완료를 뜻하지는 않습니다.
 기본 설정은 0이지만 **실제 기여 항목이 없는 0점 결과는 노출하지 않습니다**.
 추천도 계산 전에 마감·명확한 자격 불일치를 제외합니다.
 같은 점수는 ID 순서로 정렬하며 최신성·임박성으로 동점을 깨지 않습니다.
@@ -153,6 +155,8 @@ ID를 화면 코드에 임의 생성하지 말고 API 응답을 사용합니다.
 `contest`, `education`, `scholarship`, `career`, `startup`, `overseas`, `volunteer`, `other`.
 
 `category=education&category=contest`는 두 분류의 합집합입니다. 단일 값도 지원합니다.
+작성자 출처 분류는 `sw_center`, `ai_bootcamp`, `rise`, `industry_education`, `gwangyang`, `other`입니다.
+알려진 다섯 작성자 외에는 `other`로 분류하며 내용 카테고리와 독립적으로 필터링합니다.
 필터는 전체 개수 계산, 추천 정렬과 페이지 분할 전에 적용됩니다.
 
 목록 응답:
@@ -168,7 +172,7 @@ ID를 화면 코드에 임의 생성하지 말고 API 응답을 사용합니다.
 ```
 
 추천 응답에는 계산에 사용한 `profile_version`이 들어갑니다.
-목록 카드에는 `id`, `title`, `source_code`, `source_name`, `posted_date`, `original_url`,
+목록 카드에는 `id`, `title`, `source_code`, `source_name`, `author_name`, `publisher_category`, `posted_date`, `original_url`,
 `category`, `summary_lines`, `deadline_date`, `deadline_at`, `d_day`, `deadline_label`,
 `is_closed`, `is_bookmarked`, `needs_review`, `recommendation`이 있습니다.
 
@@ -192,12 +196,15 @@ ID를 화면 코드에 임의 생성하지 말고 API 응답을 사용합니다.
 | `warnings` | 원문 확인·모호한 일정·미검수 제도 등 경고 코드 |
 | `analyzed_at` | 분석 완료 시각, Unix 초 |
 
-`data.summary_lines`는 정확히 세 줄, 대상 / 활동 / 신청·행사 일정입니다.
+`data.summary_lines`는 정확히 세 줄, 대상 / 내용 / 일정입니다. 현재 React 상세는 별도 본문·일정 영역을 표시하지 않지만 상세 API의 본문·일정 배열은 유지합니다.
+`data.recruitment_text`는 원문에 명시된 모집인원 문구이며 없으면 `null`입니다. 지원 자격인 `target_text`와 구분하고 추천의 강제 자격 필터에 쓰지 않습니다.
+자동 분석 실패 시 `status=failed`, `provider=rules_fallback`이며 `warnings`에 실패 원인 코드가 포함됩니다. 프론트는 상세에서 원문 확인을 안내합니다.
 `target_*`은 근거가 확인된 경우에만 추천의 강제 자격 필터에 쓰입니다.
 본문이 이미지/첨부 위주인 경우 그 안의 조건을 읽었다고 가정하지 않습니다.
 AI 응답의 confidence는 교정된 정확도 지표가 아닙니다.
 
 상금은 `prize.status`로 구분합니다.
+표에 명시된 상금은 행·열 순서를 보존한 원문 근거를 `prize.description`에 줄 단위로 표시합니다. 합계·수상 가능성을 추정하지 않습니다.
 `present`는 있음, `none`은 없음이 명시됨, `not_stated`는 확인 불가/미기재입니다.
 설명이 없으면 금액을 0원으로 표시하지 않습니다.
 `mileages`는 `system`, `points_text`, `condition`, `evidence`를 갖는 배열입니다.
@@ -252,14 +259,14 @@ AI 응답의 confidence는 교정된 정확도 지표가 아닙니다.
 
 ```json
 {
-  "sources": ["SCNU_MAIN","SCNU_SW","SCNU_AI"],
+  "sources": ["SCNU_MAIN"],
   "pages": 1,
   "max_notices": 5,
   "max_age_days": 60
 }
 ```
 
-최대 3페이지, 출처별 최대 50건, 기간 최대 365일입니다.
+최대 5페이지, 출처별 최대 40건, 기간 최대 365일입니다. API 기본값은 1페이지·40건·60일, 자동 수집은 5페이지·40건, 수동 CLI 기본값은 1페이지·5건입니다. 기존 공지도 처리 한도에 포함되며 다음 주기에 이어서 40건을 가져오는 방식이 아닙니다.
 202는 수집 완료가 아닙니다. 반환된 job ID로 `queued/running/completed/partial/failed` 상태를 확인합니다.
 worker가 실행되어야 대기 작업을 처리합니다.
 기본 수집 비활성화 시 403 `CRAWLING_DISABLED`,
@@ -287,7 +294,7 @@ worker lease가 실제 동시 수집을 제한합니다.
 
 | 상태 | 화면 처리 |
 | --- | --- |
-| 400 | 토큰·요청 확인; 확인 링크는 새로 발급 |
+| 400 | 오류 코드에 따라 요청 형식·허용된 인수를 확인 |
 | 401 | 인증 상태 제거 후 로그인 |
 | 403 | 관리자 권한 또는 수집 설정 확인 |
 | 404 | 없어진 공지·잘못된 경로 안내 |

@@ -1,7 +1,8 @@
 from sqlalchemy import func, select
 from app.models import Bookmark, Notice, NoticeAnalysis, Source, now_ts
-from app.reference import SOURCES
+from app.reference import PUBLISHER_CATEGORIES, SOURCES
 from app.schemas import AnalysisData
+from app.services.analysis import clean_summary_lines
 from app.services.dates import deadline_badge
 from app.services.recommendations import score_notice
 
@@ -16,9 +17,12 @@ def card(notice, bookmarks=None, recommendation=None, now=None):
     data = AnalysisData.model_validate(a.data)
     day, label, closed = deadline_badge(a.deadline_date, a.deadline_at, now)
     return {"id": notice.id, "title": notice.title, "source_code": notice.source_code,
-        "source_name": SOURCES[notice.source_code]["name"], "posted_date": notice.posted_date,
+        "source_name": PUBLISHER_CATEGORIES[notice.publisher_category] if notice.source_code == "SCNU_MAIN"
+                       else SOURCES[notice.source_code]["name"],
+        "author_name": notice.author_name, "publisher_category": notice.publisher_category,
+        "posted_date": notice.posted_date,
         "original_url": notice.original_url, "category": data.category,
-        "summary_lines": data.summary_lines, "deadline_date": a.deadline_date,
+        "summary_lines": clean_summary_lines(data.summary_lines), "deadline_date": a.deadline_date,
         "deadline_at": a.deadline_at, "d_day": day, "deadline_label": label,
         "is_closed": closed, "is_bookmarked": notice.id in (bookmarks or set()),
         "needs_review": a.status != "reviewed", "recommendation": recommendation}
@@ -33,10 +37,10 @@ def detail(notice, bookmarks=None, recommendation=None):
         fetched_at=notice.last_seen_at)
     return result
 
-def filtered_query(source=None, q=None, category=None, include_closed=True,
-                   after=None, deadline_before=None, now=None):
+def filtered_query(source=None, q=None, category=None, publisher_category=None, include_closed=True,
+                   after=None, deadline_before=None, now=None, analysis_success_only=False):
     now = now_ts() if now is None else now
-    stmt = select(Notice).join(NoticeAnalysis)
+    stmt = select(Notice).join(NoticeAnalysis).where(Notice.source_code == "SCNU_MAIN")
     if source:
         stmt = stmt.where(Notice.source_code == source)
     if q:
@@ -44,6 +48,11 @@ def filtered_query(source=None, q=None, category=None, include_closed=True,
     if category:
         categories = [category] if isinstance(category, str) else category
         stmt = stmt.where(NoticeAnalysis.category.in_(categories))
+    if publisher_category:
+        stmt = stmt.where(Notice.publisher_category == publisher_category)
+    if analysis_success_only:
+        stmt = stmt.where(NoticeAnalysis.provider == "openai",
+                          NoticeAnalysis.status.in_(("analyzed", "needs_review")))
     if not include_closed:
         stmt = stmt.where((NoticeAnalysis.deadline_at.is_(None)) | (NoticeAnalysis.deadline_at >= now))
     if after:

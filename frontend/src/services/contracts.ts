@@ -1,5 +1,6 @@
 export type AcademicStatus = 'enrolled' | 'on_leave' | 'graduating' | 'graduated'
 export type SourceCode = 'SCNU_MAIN' | 'SCNU_SW' | 'SCNU_AI'
+export type PublisherCategory = 'sw_center' | 'ai_bootcamp' | 'rise' | 'industry_education' | 'gwangyang' | 'other'
 export type Category = 'contest' | 'education' | 'scholarship' | 'career' | 'startup' | 'overseas' | 'volunteer' | 'other'
 export interface InterestDto { id: string; name: string; type: 'field' | 'activity' }
 export interface SourceDto { code: SourceCode; name: string; list_url: string; enabled: boolean; last_success_at: number | null }
@@ -18,7 +19,8 @@ export interface RecommendationDto {
   policy_version: string
 }
 export interface NoticeCardDto {
-  id: number; title: string; source_code: SourceCode; source_name: string; posted_date: string; original_url: string
+  id: number; title: string; source_code: SourceCode; source_name: string; author_name: string | null
+  publisher_category: PublisherCategory; posted_date: string; original_url: string
   category: Category; summary_lines: string[]; deadline_date: string | null; deadline_at: number | null
   d_day: number | null; deadline_label: string; is_closed: boolean; is_bookmarked: boolean
   needs_review: boolean; recommendation: RecommendationDto | null
@@ -31,7 +33,7 @@ export interface ScheduleDto {
 export interface NoticeDetailDto extends NoticeCardDto {
   body_text: string; attachments: { name: string; url: string | null }[]; content_hash: string; image_only: boolean; fetched_at: number
   analysis: { provider: string; status: string; warnings: string[]; analyzed_at: number; data: {
-    target_text: string | null; summary_lines: string[]; schedules: ScheduleDto[]; application_method: string | null
+    target_text: string | null; recruitment_text: string | null; summary_lines: string[]; schedules: ScheduleDto[]; application_method: string | null
     prize: { status: 'present' | 'none' | 'not_stated'; description: string | null; evidence: string | null }
     mileages: { system: string; points_text: string | null; condition: string | null; evidence: string }[]
   } }

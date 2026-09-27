@@ -158,7 +158,7 @@ def test_fresh_db_creates_missing_parent_before_migration(settings, tmp_path):
     engine = create_engine(config.database_url)
     try:
         with engine.connect() as connection:
-            assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0002"
+            assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "0003"
             assert connection.execute(text("SELECT count(*) FROM notices")).scalar_one() == 0
             assert connection.execute(text("SELECT count(*) FROM sources")).scalar_one() == 3
     finally:

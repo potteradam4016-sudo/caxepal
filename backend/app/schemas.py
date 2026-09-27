@@ -4,6 +4,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 Status = Literal["enrolled", "on_leave", "graduating", "graduated"]
 SourceCode = Literal["SCNU_MAIN", "SCNU_SW", "SCNU_AI"]
+ActiveSourceCode = Literal["SCNU_MAIN"]
+PublisherCategory = Literal["sw_center", "ai_bootcamp", "rise", "industry_education", "gwangyang", "other"]
 Category = Literal["contest", "education", "scholarship", "career", "startup", "overseas", "volunteer", "other"]
 
 class StrictModel(BaseModel):
@@ -122,6 +124,7 @@ class AnalysisData(StrictModel):
     activity_ids: list[str] = Field(max_length=20)
     tags: list[str] = Field(max_length=20)
     target_text: str | None = Field(max_length=3000)
+    recruitment_text: str | None = Field(default=None, max_length=1500)
     target_departments: list[str] = Field(max_length=50)
     target_grades: list[int] = Field(max_length=6)
     target_statuses: list[Status] = Field(max_length=4)
@@ -183,6 +186,8 @@ class NoticeCard(BaseModel):
     title: str
     source_code: SourceCode
     source_name: str
+    author_name: str | None
+    publisher_category: PublisherCategory
     posted_date: date
     original_url: str
     category: str
@@ -247,9 +252,9 @@ class CalendarOut(BaseModel):
     undated: list[UndatedItem]
 
 class CrawlInput(StrictModel):
-    sources: list[SourceCode] = Field(default_factory=lambda: ["SCNU_MAIN", "SCNU_SW", "SCNU_AI"], min_length=1, max_length=3)
-    pages: int = Field(default=1, ge=1, le=3)
-    max_notices: int = Field(default=20, ge=1, le=50)
+    sources: list[ActiveSourceCode] = Field(default_factory=lambda: ["SCNU_MAIN"], min_length=1, max_length=1)
+    pages: int = Field(default=1, ge=1, le=5)
+    max_notices: int = Field(default=40, ge=1, le=40)
     max_age_days: int = Field(default=60, ge=1, le=365)
     @field_validator("sources")
     @classmethod

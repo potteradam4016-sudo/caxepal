@@ -6,24 +6,50 @@ from app.schemas import Schedule
 
 SEOUL = ZoneInfo("Asia/Seoul")
 FULL_DATE = re.compile(
-    r"(?<!\d)(20\d{2})\s*(?:[./-]|년)\s*(\d{1,2})\s*(?:[./-]|월)\s*(\d{1,2})(?:\s*일)?(?!\d)"
+    r"(?<!\d)(20\d{2}|['’]\d{2})\s*(?:[./-]|년)\s*(\d{1,2})\s*(?:[./-]|월)\s*(\d{1,2})(?:\s*일)?(?!\d)"
 )
+SHORT_DATE = re.compile(r"(?<![\d.])(\d{1,2})\s*(?:[./-]|월)\s*(\d{1,2})(?:\s*일)?(?!\d)")
+YEAR_MONTH = re.compile(r"(?<!\d)20\d{2}\s*(?:[./-]|년)\s*\d{1,2}\s*(?:월|[./-])")
 CLOCK = re.compile(r"(?<!\d)([01]?\d|2[0-3])\s*(?::\s*([0-5]\d)|시(?:\s*([0-5]?\d)분)?)(?!\d)")
+
+def has_date_expression(text: str) -> bool:
+    return bool(FULL_DATE.search(text) or SHORT_DATE.search(text) or YEAR_MONTH.search(text))
 
 def local_today(now: int | None = None) -> date:
     return datetime.fromtimestamp(now, tz=SEOUL).date() if now is not None else datetime.now(SEOUL).date()
 
 def dates_in_text(text: str) -> list[tuple[date, time | None]]:
     found = []
-    matches = list(FULL_DATE.finditer(text))
-    for index, match in enumerate(matches):
+    matches = []
+    full_matches = list(FULL_DATE.finditer(text))
+    for match in full_matches:
         try:
-            d = date(*map(int, match.groups()))
+            year, month, day = match.groups()
+            d = date(2000 + int(year[1:]) if year.startswith(("'", "’")) else int(year),
+                     int(month), int(day))
         except ValueError:
             continue
-        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        matches.append((match.start(), match.end(), d))
+    for match in SHORT_DATE.finditer(text):
+        if any(start <= match.start() < end for start, end, _ in matches):
+            continue
+        previous = max(((start, end, d) for start, end, d in matches
+                        if end <= match.start()), key=lambda item: item[1], default=None)
+        if previous is None or not re.fullmatch(
+            r"\s*\.?\s*(?:\([^)]*\)\s*)?[~∼～]\s*", text[previous[1]:match.start()]):
+            continue
+        try:
+            d = date(previous[2].year, int(match[1]), int(match[2]))
+        except ValueError:
+            continue
+        if d < previous[2]:
+            continue
+        matches.append((match.start(), match.end(), d))
+    matches.sort(key=lambda item: item[0])
+    for index, (_start, end_pos, d) in enumerate(matches):
+        end = matches[index + 1][0] if index + 1 < len(matches) else len(text)
         # Ignore an abbreviated range's end-time, which must not become a start-time.
-        tail = text[match.end():end]
+        tail = text[end_pos:end]
         clock = CLOCK.search(tail[:30]) if not re.search(r"[~∼～]", tail) else None
         t = None
         if clock:

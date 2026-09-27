@@ -103,6 +103,6 @@ def maybe_schedule(factory, settings):
             last = db.scalar(select(CrawlJob).order_by(CrawlJob.created_at.desc()).limit(1))
             if last and (last.status in {"queued","running"} or now_ts()-last.created_at < settings.crawl_interval_seconds):
                 return
-            enqueue(db, CrawlInput(pages=3))
+            enqueue(db, CrawlInput(pages=5))
     finally:
         release_lease(factory, "crawl-scheduler", owner)

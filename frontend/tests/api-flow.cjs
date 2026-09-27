@@ -171,7 +171,7 @@ async function main() {
     await click('통합 시험 AI 해커톤 1 찜 추가')
     await page.getByRole('button', { name: '통합 시험 AI 해커톤 1 찜 해제', exact: true }).waitFor()
     await click('통합 시험 AI 해커톤 1 상세 보기')
-    await page.getByText('시험 행사', { exact: false }).waitFor()
+    await page.getByRole('dialog').getByRole('link', { name: '원문 보기' }).waitFor()
     await screenshot('05-detail')
     await page.keyboard.press('Escape')
     await click('내 정보 수정')

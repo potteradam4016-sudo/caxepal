@@ -1,7 +1,29 @@
 import json
+import re
 from pathlib import Path
 
 STATUS_LABELS = {"enrolled": "재학생", "on_leave": "휴학생", "graduating": "졸업예정자", "graduated": "졸업생"}
+AI_SW_TOPIC = re.compile(
+    r"(?<![A-Za-z0-9])(?:AI|SW)(?![A-Za-z0-9])|인공\s*지능|소프트웨어|머신\s*러닝|딥\s*러닝|프로그래밍|코딩",
+    re.IGNORECASE,
+)
+PUBLISHER = re.compile(r"(?:국립)?순천대학교|SW\s*중심\s*대학(?:\s*사업단)?|AI\s*인재\s*양성\s*부트캠프\s*사업단", re.IGNORECASE)
+TOPIC_LINE = re.compile(
+    r"^\s*(?:[○●▶•*\-]\s*|\d+[.)]\s*)?(?:주제|프로그램\s*(?:명|내용|소개)?|활동\s*(?:명|내용|소개)?|교육\s*(?:명|내용|소개)?|모집\s*인원)\s*[:：\-]\s*(.+)$"
+)
+
+def normalized(value):
+    return "".join(value.split()).casefold()
+
+def has_ai_sw_topic(title, body_text):
+    title = PUBLISHER.sub("", title)
+    if AI_SW_TOPIC.search(title):
+        return True
+    for line in body_text.splitlines():
+        match = TOPIC_LINE.match(line)
+        if match and AI_SW_TOPIC.search(PUBLISHER.sub("", match[1])):
+            return True
+    return False
 
 def load_policy():
     p = json.loads((Path(__file__).resolve().parents[2] / "config/recommendation-policy.json").read_text(encoding="utf-8"))
@@ -11,15 +33,17 @@ def load_policy():
         raise ValueError("Weights must be nonnegative and sum to 100.")
     if not 0 <= p["all_departments_score"] <= p["weights"]["department"]:
         raise ValueError("Invalid all-departments score")
+    if not 0 <= p["topic_department_score"] <= p["weights"]["department"]:
+        raise ValueError("Invalid topic-department score")
+    if len({normalized(name) for name in p["ai_sw_departments"]}) != len(p["ai_sw_departments"]):
+        raise ValueError("Duplicate AI/SW department")
     if not 0 <= p["all_grades_score"] <= p["weights"]["grade"]:
         raise ValueError("Invalid all-grades score")
     return p
 
-def score_notice(data, profile, policy):
+def score_notice(data, profile, policy, *, title="", body_text=""):
     """No dates or posted timestamps are accepted by this function."""
     known = data.eligibility_confirmed
-    def normalized(value):
-        return "".join(value.split()).casefold()
     depts = [normalized(x) for x in data.target_departments]
     match_dept = normalized(profile["department"]) in depts
     match_grade = profile["grade"] in data.target_grades
@@ -41,9 +65,17 @@ def score_notice(data, profile, policy):
         parts.append({"criterion": name, "score": score, "max_score": w[name], "reason": reason if score else None})
     part("field", w["field"] if field_hits else 0,
          "관심 분야 일치: " + ", ".join(user_fields[x] for x in field_hits))
-    part("department", w["department"] if known and match_dept else
-         policy["all_departments_score"] if known and data.all_departments else 0,
-         f"{profile['department']} 대상" if match_dept else "전 학과 대상 명시")
+    if known and match_dept:
+        department_score, department_reason = w["department"], f"{profile['department']} 대상"
+    elif known and data.all_departments:
+        department_score, department_reason = policy["all_departments_score"], "전 학과 대상 명시"
+    elif (normalized(profile["department"]) in {normalized(name) for name in policy["ai_sw_departments"]}
+          and has_ai_sw_topic(title, body_text)):
+        department_score = policy["topic_department_score"]
+        department_reason = f"{profile['department']}와 AI·SW 주제가 관련 있어요"
+    else:
+        department_score, department_reason = 0, None
+    part("department", department_score, department_reason)
     part("academic_status", w["academic_status"] if known and match_status else 0,
          f"{STATUS_LABELS[profile['academic_status']]} 대상 명시")
     part("grade", w["grade"] if known and match_grade else

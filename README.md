@@ -35,7 +35,7 @@ React 프론트와 FastAPI 백엔드가 실제 API로 연결되어 있습니다.
 | `docs/작업명` | 기획·디자인 문서 작업 | `dev` |
 
 통합 브랜치 이름은 **`dev`**로 통일합니다. `develop`을 별도로 만들지 않습니다.
-초기 제공 브랜치는 `main`, `dev`, `feature/frontend-setup`, `feature/backend-setup` 네 개이며 최신 통합 상태는 `dev`에서 확인합니다.
+표의 기능 브랜치는 이름 예시이며 최신 통합 상태는 `dev`에서 확인합니다.
 
 **작업 흐름:** `dev`에서 작업 브랜치 생성 → 작업·커밋 → 작업 브랜치 push → PR의 base를 `dev`로 지정 → 검토·병합 → 통합 검수 → `dev`에서 `main`으로 PR.
 
@@ -47,7 +47,9 @@ React 프론트와 FastAPI 백엔드가 실제 API로 연결되어 있습니다.
 | 백엔드 | FastAPI |
 | 디자인 전달 | Figma |
 | 회원가입·로그인 | 아이디 + 비밀번호, 서버 Bearer 세션 인증 |
-| DB·배포·AI 제공자 | 미정, 담당자가 제안하고 팀에서 결정 |
+| DB | 운영 PostgreSQL, 로컬·자동 테스트는 SQLite도 지원 |
+| 분석 | 규칙 기반 + 선택적 OpenAI Responses API, 실패 시 규칙 결과와 실패 상태 표시 |
+| 배포 | API·worker 분리 구성 제공, 실제 플랫폼·도메인·운영 설정 확인 필요 |
 | 프론트 도구 | Vite + React + TypeScript, npm |
 | 실행 명령 | 백엔드: `backend/START.cmd`, 프론트: `cd frontend` 후 `npm run dev` |
 
@@ -63,9 +65,10 @@ React 프론트와 FastAPI 백엔드가 실제 API로 연결되어 있습니다.
 - [기능과 화면 범위](docs/product-scope.md)
 - [Git·커밋·PR 규칙](CONTRIBUTING.md)
 - [역할별 첫 작업](docs/team-tasks.md)
-- [디자인 전달 체크리스트](docs/design-handoff.md)
+- [현재 PC 구현 명세](docs/design/pc/implementation-spec.md)
 - [프론트·백 API 계약](docs/api-contract.md)
 - [크롤링 허가 진행표](docs/crawling-permission.md)
-- [저장소 관리자 설정](docs/repository-setup.md)
+- [배포 전 확인 목록](docs/deployment-checklist.md)
+- [배포 설정과 실행 순서](backend/docs/DEPLOYMENT.md)
 
-PR과 이슈 작성 양식을 포함합니다. 코드 구현을 시작한 뒤 실제 빌드·테스트 명령이 정해지면 CI를 추가합니다.
+PR과 이슈 작성 양식을 포함합니다. 자동 CI는 아직 설치되지 않았으며 백엔드 예시만 `backend/docs/backend-ci.yml.example`에 있습니다. 검증 명령과 최신 결과는 [검증 보고서](backend/docs/TEST_REPORT.md)를 참고합니다.

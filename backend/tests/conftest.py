@@ -60,7 +60,7 @@ def user_factory(client):
 def notice_factory(app):
     counter = 0
     def create(title="AI 해커톤", body="대상: 컴퓨터공학과 2학년 재학생\n신청 마감: 2070.09.30 18:00",
-               posted=date(2026,9,18), source="SCNU_SW", modify=None):
+               posted=date(2026,9,18), source="SCNU_MAIN", modify=None):
         nonlocal counter
         counter += 1
         import hashlib
