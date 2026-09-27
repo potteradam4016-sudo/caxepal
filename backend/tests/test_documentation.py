@@ -20,14 +20,18 @@ def test_all_markdown_documents_have_korean_titles():
 
 
 def test_local_markdown_links_resolve():
-    for path in markdown_files():
+    repository = ROOT.parent
+    paths = [*markdown_files(), repository / "README.md", repository / "CONTRIBUTING.md",
+             repository / "frontend/README.md", *sorted((repository / "docs").rglob("*.md")),
+             *sorted((repository / ".github").rglob("*.md"))]
+    for path in paths:
         text = path.read_text(encoding="utf-8")
         for link in re.findall(r"\[[^\]]+\]\(([^)\s]+)\)", text):
             parsed = urlsplit(link)
             if parsed.scheme or not parsed.path:
                 continue
             target = (path.parent / unquote(parsed.path)).resolve()
-            assert target.is_relative_to(ROOT), (path.name, link)
+            assert target.is_relative_to(repository), (path.name, link)
             assert target.exists(), (path.name, link)
 
 

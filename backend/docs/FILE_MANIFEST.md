@@ -1,95 +1,27 @@
-# 전체 백엔드 파일 목록
+# 백엔드 파일 구성
 
-통합 ZIP의 `backend/`에는 파일 87개가 들어 있습니다.
-개인 설정, DB, 가상환경, 테스트 캐시는 제외합니다.
+현재 Git 저장소 기준의 역할 안내입니다. 초기 ZIP의 고정 파일 개수는 현재 소스 개수와 다르므로 사용하지 않습니다.
 
-| 경로 | 역할 |
+| 위치 | 역할 |
 | --- | --- |
-| `.dockerignore` | 구성 파일 |
-| `.env.example` | 구성 파일 |
-| `.gitattributes` | 구성 파일 |
-| `.gitignore` | 구성 파일 |
-| `Dockerfile` | 구성 파일 |
-| `README.md` | 설명·명세 |
-| `SHA256SUMS.txt` | 구성 파일 |
-| `START.cmd` | 실행·검증 도구 |
-| `alembic.ini` | 구성 파일 |
-| `app/__init__.py` | API·업무 코드 |
-| `app/api/__init__.py` | API·업무 코드 |
-| `app/api/admin.py` | API·업무 코드 |
-| `app/api/auth.py` | API·업무 코드 |
-| `app/api/bookmarks.py` | API·업무 코드 |
-| `app/api/notices.py` | API·업무 코드 |
-| `app/api/profile.py` | API·업무 코드 |
-| `app/asgi.py` | API·업무 코드 |
-| `app/cli.py` | API·업무 코드 |
-| `app/config.py` | API·업무 코드 |
-| `app/crawlers/__init__.py` | API·업무 코드 |
-| `app/crawlers/client.py` | API·업무 코드 |
-| `app/crawlers/parser.py` | API·업무 코드 |
-| `app/db.py` | API·업무 코드 |
-| `app/errors.py` | API·업무 코드 |
-| `app/factory.py` | API·업무 코드 |
-| `app/middleware.py` | API·업무 코드 |
-| `app/models.py` | API·업무 코드 |
-| `app/reference.py` | API·업무 코드 |
-| `app/schemas.py` | API·업무 코드 |
-| `app/security.py` | API·업무 코드 |
-| `app/services/__init__.py` | API·업무 코드 |
-| `app/services/analysis.py` | API·업무 코드 |
-| `app/services/crawl.py` | API·업무 코드 |
-| `app/services/dates.py` | API·업무 코드 |
-| `app/services/jobs.py` | API·업무 코드 |
-| `app/services/notices.py` | API·업무 코드 |
-| `app/services/profiles.py` | API·업무 코드 |
-| `app/services/rate_limit.py` | API·업무 코드 |
-| `app/services/recommendations.py` | API·업무 코드 |
-| `app/worker.py` | API·업무 코드 |
-| `compose.yml` | 구성 파일 |
-| `config/recommendation-policy.json` | 구성 파일 |
-| `docs/API_CONTRACT.md` | 설명·명세 |
-| `docs/ARCHITECTURE.md` | 설명·명세 |
-| `docs/COMMIT_GUIDE.md` | 설명·명세 |
-| `docs/COMMIT_INITIAL.txt` | 설명·명세 |
-| `docs/COMMIT_UPDATE.txt` | 설명·명세 |
-| `docs/COMMIT_USERNAME_API.txt` | 설명·명세 |
-| `docs/CRAWLER_AND_AI.md` | 설명·명세 |
-| `docs/DEPLOYMENT.md` | 설명·명세 |
-| `docs/FILE_MANIFEST.md` | 설명·명세 |
-| `docs/LOCAL_TEST_GUIDE.md` | 설명·명세 |
-| `docs/REQUIREMENTS_TRACEABILITY.md` | 설명·명세 |
-| `docs/SOURCES_AND_DECISIONS.md` | 설명·명세 |
-| `docs/STARTUP_FIX.md` | 설명·명세 |
-| `docs/TEST_REPORT.md` | 설명·명세 |
-| `docs/UPLOAD_GUIDE.md` | 설명·명세 |
-| `docs/USERNAME_AUTH_CHANGES.md` | 설명·명세 |
-| `docs/backend-ci.yml.example` | 설명·명세 |
-| `docs/http-verification.json` | 설명·명세 |
-| `docs/openapi.json` | 설명·명세 |
-| `docs/requests.http` | 설명·명세 |
-| `docs/verification-summary.json` | 설명·명세 |
-| `migrations/env.py` | DB 마이그레이션 |
-| `migrations/script.py.mako` | DB 마이그레이션 |
-| `migrations/versions/0001_initial_backend_schema.py` | DB 마이그레이션 |
-| `migrations/versions/0002_username_auth.py` | DB 마이그레이션 |
-| `migrations/versions/0003_notice_author_category.py` | DB 마이그레이션 |
-| `pyproject.toml` | 구성 파일 |
-| `requirements-dev.txt` | 구성 파일 |
-| `requirements-postgres.txt` | 구성 파일 |
-| `requirements.txt` | 구성 파일 |
-| `scripts/package_backend.py` | 실행·검증 도구 |
-| `scripts/verify_backend.py` | 실행·검증 도구 |
-| `start.py` | 실행·검증 도구 |
-| `tests/__init__.py` | 자동 테스트 |
-| `tests/conftest.py` | 자동 테스트 |
-| `tests/fixtures/detail.html` | 자동 테스트 |
-| `tests/fixtures/list.html` | 자동 테스트 |
-| `tests/test_analysis_security.py` | 자동 테스트 |
-| `tests/test_atomic_migrations.py` | 자동 테스트 |
-| `tests/test_auth.py` | 자동 테스트 |
-| `tests/test_crawler.py` | 자동 테스트 |
-| `tests/test_dates_calendar.py` | 자동 테스트 |
-| `tests/test_documentation.py` | 자동 테스트 |
-| `tests/test_profile_notices.py` | 자동 테스트 |
-| `tests/test_runtime_smoke.py` | 자동 테스트 |
-| `tests/test_startup.py` | 자동 테스트 |
+| `app/config.py`, `.env.example` | 서버 설정·운영 검증·비밀값 없는 예시 |
+| `app/asgi.py`, `app/factory.py` | FastAPI 진입점·미들웨어·라우터 |
+| `app/api/` | 인증·프로필·공지·찜·캘린더·관리자 API |
+| `app/models.py`, `app/schemas.py`, `app/db.py` | DB 모델·입출력·연결 |
+| `app/crawlers/` | 대표 게시판 수집·작성자·표 본문 파싱 |
+| `app/services/` | 분석·일정·요약 정리·추천·수집·세션·요청 제한 |
+| `app/reference.py`, `config/` | 게시판·작성자 분류·관심사·추천 정책 |
+| `app/cli.py`, `app/worker.py` | 운영 명령·독립 작업 처리기 |
+| `migrations/versions/` | 0001 초기, 0002 아이디 인증, 0003 작성자·출처 분류 |
+| `start.py`, `START.cmd` | 개발 환경 준비·API와 worker 실행 |
+| `Dockerfile`, `compose.yml` | 운영 API·worker 컨테이너 구성 |
+| `requirements*.txt`, `pyproject.toml` | 의존성·테스트 설정 |
+| `tests/` | 합성 입력·임시 SQLite·별도 PostgreSQL·실제 HTTP 검증 |
+| `tests/serve_frontend_fixture.py` | 프론트 브라우저 시험용 격리 API |
+| `scripts/verify_backend.py` | 실제 로컬 HTTP 흐름 검증 |
+| `scripts/package_backend.py` | 별도 전달용 패키지 생성 도구 |
+| `docs/` | 현재 계약·실행·배포 안내와 초기 전달 기록 |
+
+전체 추적 파일은 저장소 루트에서 `git ls-files backend`로 확인합니다. `.env`, `.venv/`, 실제 DB·로그·캐시는 배포 소스에 포함하지 않습니다.
+
+과거 `COMMIT_*.txt`와 ZIP 검증 산출물은 당시 기록이며 현재 변경 내용·테스트 결과를 보증하지 않습니다. 현재 결과는 [검증 보고서](TEST_REPORT.md)가 기준입니다.

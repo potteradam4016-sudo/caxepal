@@ -2,6 +2,8 @@
 
 Python 3.11 이상에서 `backend` 폴더의 `python start.py`를 실행합니다. Windows에서는 `START.cmd`를 사용할 수 있습니다. 상태는 `http://localhost:3104/health`, API 시험 화면은 `http://localhost:3104/docs`입니다.
 
+PostgreSQL을 쓰는 경우 [백엔드 README](../README.md)의 `requirements-postgres.txt` 설치를 먼저 진행합니다. 사용자 화면은 별도 터미널에서 `frontend`로 이동해 `npm install`, `npm run dev` 실행 후 `http://localhost:5173`에 접속합니다.
+
 ## 가입과 로그인
 
 `POST /api/auth/register`에 다음 JSON을 입력합니다.
@@ -22,22 +24,23 @@ Python 3.11 이상에서 `backend` 폴더의 `python start.py`를 실행합니�
 {"current_password":"long-passphrase-123","new_password":"another-passphrase-123"}
 ```
 
-성공하면 모든 세션이 폐기됩니다. 새 비밀번호로 다시 로그인합니다. 분실한 비밀번호의 셀프 복구는 MVP에 포함하지 않습니다. 운영상 신원 확인 절차가 정해질 때까지 새 계정을 사용합니다.
+성공하면 모든 세션이 폐기됩니다. 새 비밀번호로 다시 로그인합니다. 이 기능은 API만 있으며 현재 React에는 비밀번호 변경 화면이 없습니다. 분실한 비밀번호의 셀프 복구는 MVP에 포함하지 않습니다.
 
 ## 관리자 권한
 
 서버 운영자가 이미 가입한 아이디에 권한을 부여합니다.
 
 ```powershell
-python -m app.cli grant-admin --username student01
-python -m app.cli grant-admin --username student01 --revoke
+.\.venv\Scripts\python.exe -m app.cli grant-admin --username student01
+.\.venv\Scripts\python.exe -m app.cli grant-admin --username student01 --revoke
 ```
 
 ## 자동 검증
 
 ```powershell
-python -m pytest -q
-python scripts/verify_backend.py
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe scripts/verify_backend.py
 ```
 
 HTTP 검증 도구는 임시 DB와 로컬 API 프로세스를 사용합니다. 실제 학교 사이트와 외부 AI는 호출하지 않습니다.

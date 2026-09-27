@@ -1,19 +1,18 @@
 # SCNU PICK 백엔드
 
-프론트엔드 없이 독립 실행되는 FastAPI 백엔드입니다. 이 폴더 전체를 팀 저장소의 `backend/`에 넣습니다.
-기존 `frontend/`, 루트 `docs/`, `.github/` 파일을 덮어쓰지 않습니다.
+React 프론트와 연동된 FastAPI 백엔드입니다. API와 worker는 이 폴더에서 실행하고 사용자 화면은 저장소의 `frontend/`에서 별도로 실행합니다.
 
-> 이 구현의 기능 기준은 첨부 저장소 `docs/product-scope.md`입니다.
+> 기능 기준은 저장소 루트 `docs/product-scope.md`입니다.
 > 추천 / 신규 / **찜 기반 월간 캘린더**, 아이디·비밀번호 인증, 대표 게시판 단일 수집과 작성자 분류를 반영했습니다.
 > 과거 기획서의 네 번째 출처·별도 마감 메뉴·Supabase Auth를 그대로 가져온 버전이 아닙니다.
-> API 경로·관심사 사전·추천 가중치·인증 방식·운영 서비스는 **구현 제안값**이며 팀 합의가 필요합니다.
+> API 경로와 인증은 현재 React와 연동된 계약입니다. 관심사·추천 정책의 최종 승인과 운영 플랫폼 결정은 별도입니다.
 
 ## 1. 처음 시작하기
 
 Python 3.11 이상이 필요합니다. 이번 인증 전환은 Windows / Python 3.12.14에서 검증했습니다.
 Windows에서는 Python이 설치되어 있고 `python --version`이 정상 출력되는지 먼저 확인합니다.
 
-압축을 푼 `backend` 폴더에서:
+저장소의 `backend` 폴더에서:
 
 ```powershell
 python start.py
@@ -27,6 +26,17 @@ macOS/Linux에서 `python` 명령이 없다면 `python3 start.py`를 사용합�
 → 출처·관심사 사전 초기화 → API와 작업 처리기 실행입니다.
 이미 존재하는 `.env`와 사용자 DB는 초기화하거나 삭제하지 않습니다.
 
+기존 `.env`에서 PostgreSQL을 선택했다면 실행 전에 드라이버까지 준비합니다. `start.py`의 기본 패키지 설치만으로 PostgreSQL 드라이버가 설치되지는 않습니다.
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-postgres.txt
+.\.venv\Scripts\python.exe -m app.cli init-db
+python start.py
+```
+
+위 명령은 유효한 `backend/.env` 설정을 전제로 합니다. 마이그레이션 최신 버전은 `0003`이며 운영 DB는 먼저 백업합니다. 테스트 도구는 `requirements-dev.txt`로 추가 설치합니다.
+
 | 확인 대상 | 주소 |
 | --- | --- |
 | 실행 상태 | `http://localhost:3104/health` |
@@ -34,7 +44,7 @@ macOS/Linux에서 `python` 명령이 없다면 `python3 start.py`를 사용합�
 | API JSON 명세 | `http://localhost:3104/openapi.json` |
 | 백엔드 식별 정보 | `http://localhost:3104/` |
 
-`/`에서 JSON이 보이는 것이 정상입니다. 사용자 웹 화면은 없습니다.
+`/`에서 JSON이 보이는 것이 정상입니다. 이 API 서버는 사용자 웹 화면을 제공하지 않으며 React 개발 주소는 `http://localhost:5173`입니다.
 `/health`는 `{"status":"ok","database":"ok","frontend_included":false}`를 반환합니다.
 종료는 실행한 터미널에서 `Ctrl+C`입니다.
 
@@ -50,20 +60,20 @@ macOS/Linux에서 `python` 명령이 없다면 `python3 start.py`를 사용합�
 | 공지 | 출처·카테고리·검색·기간·마감 필터, 원문 등록일 정렬, 상세·첨부 메타데이터 |
 | 추천 | 학적·관심사 적합도, 실제 점수의 이유, 항목별 점수, 신청 마감·명확한 자격 불일치 제외 |
 | 일정·찜 | 사용자별 찜, 신청/행사 일정 분리, 월과 겹치는 기간, 지난 신청/향후 행사 유지, 일정 미정 |
-| 수집 | 대표/SW/AI 세 게시판 어댑터, 요청 간격, 제한된 재시도, robots 확인, 중복 방지, 원문 변경 감지 |
+| 수집 | 대표 게시판만 수집, 작성자 6종 분류, 요청 간격, 제한된 재시도, robots 확인, 중복 방지, 원문 변경 감지 |
 | 분석 | 규칙 기반 추출, 선택적 OpenAI 구조화 요청, 근거·날짜 검증, 분석 실패 표시, 관리자 수동 검수 |
 | 운영 | DB 마이그레이션, 영속 수집 작업 큐, 별도 worker, 관리자 권한, 실행·실패 기록 |
 | 방어 조치 | 비밀번호 Argon2id 해시, 토큰 해시 저장·만료·폐기, 본인 범위 조회, 입력·본문 크기 제한, CORS, 요청 횟수 제한 |
 
 신청 처리는 운영기관의 공식 원문에서 합니다. 이 서버의 찜은 신청 완료를 의미하지 않습니다.
-학교 학생 인증·학교 SSO·푸시·챗봇·첨부파일 OCR·프론트엔드는 포함하지 않습니다.
+학교 학생 인증·학교 SSO·푸시·챗봇·첨부파일 OCR은 구현하지 않았습니다. 비밀번호 변경·탈퇴·전체 로그아웃은 API만 있으며 현재 React UI는 없습니다.
 
 ## 3. 기본 모드와 운영 모드는 다릅니다
 
 | 항목 | 로컬 기본값 | 실제 운영 전 필요한 설정 |
 | --- | --- | --- |
 | DB | SQLite 파일 | PostgreSQL 연결·접근 제어·백업/복구 검증 |
-| 인증 | 서버 자체 아이디 인증 + DB 세션 | 팀에서 방식 합의, HTTPS, 프론트 인증 흐름 연결 |
+| 인증 | 서버 자체 아이디 인증 + DB 세션 | HTTPS와 배포 주소에서 인증 흐름 검증 |
 | 분석 | `AI_PROVIDER=rules` | AI 사용 시 모델·키·비용·개인정보 처리 확인 |
 | 수집 | `CRAWL_ENABLED=false` | 저장소 허가 기록 확인 후 승인된 조건 반영 |
 | 자동 수집 | 꺼짐 | 합의된 주기와 학교의 제한 반영 |
@@ -71,8 +81,8 @@ macOS/Linux에서 `python` 명령이 없다면 `python3 start.py`를 사용합�
 
 `APP_ENV=production`은 SQLite·HTTP 프론트 주소를 거부합니다.
 
-OpenAI 분석을 켜려면 `backend/.env`에서 기존 `AI_PROVIDER=gemini`를
-`AI_PROVIDER=openai`로 바꾸고 `OPENAI_API_KEY`와 `OPENAI_MODEL=gpt-5.6-sol`을 설정합니다.
+OpenAI 분석을 켜려면 `backend/.env`에 `AI_PROVIDER=openai`, `OPENAI_API_KEY`, `OPENAI_MODEL`을 설정합니다.
+예제 모델 문자열은 `gpt-5.6-sol`이지만 실제 계정에서 사용 가능한 Responses 구조화 출력 지원 모델 ID인지 별도 확인해야 합니다.
 기존 `GEMINI_API_KEY`·`GEMINI_MODEL`은 사용하지 않습니다. 키는 프론트에 넣거나 커밋하지 않습니다.
 설정 변경 후 API와 worker를 모두 재시작해야 새 설정이 적용됩니다.
 기존 공지의 날짜 없는 일정 제목을 정리하고 본문 날짜를 다시 반영하려면
@@ -91,7 +101,7 @@ $env:TEST_DATABASE_URL="postgresql+psycopg://scnu_pick:<URL_ENCODED_PASSWORD>@12
 .venv\Scripts\python.exe -m pytest -m postgres -p no:cacheprovider
 ```
 
-테스트는 DB 이름이 `_test`로 끝나지 않으면 실행을 중단합니다. `TEST_DATABASE_URL`을 설정하지 않은 일반 테스트에서는 PostgreSQL 테스트를 건너뜁니다.
+테스트는 DB 이름이 `_test`로 끝나지 않으면 실행을 중단하며 해당 테스트 DB의 테이블 데이터를 정리합니다. 운영 데이터가 있는 DB에는 사용하지 않습니다. 이 변수는 위처럼 프로세스 환경변수로 지정해야 하며 `.env`에 적는 것만으로 테스트에 전달되지 않습니다. 미설정 시 PostgreSQL 테스트를 건너뜁니다.
 
 이 구현은 **Supabase Auth 토큰이나 JWT를 받지 않습니다**.
 자체 로그인에서 발급한 내용을 해석할 수 없는 무작위 Bearer 세션 토큰을 사용합니다.
@@ -111,13 +121,13 @@ Supabase Auth를 사용하기로 합의하면 인증 계층과 프론트 계약�
 | [배포 전 설정](docs/DEPLOYMENT.md) | PostgreSQL·Docker·학교 서버 연결 시 점검 |
 | [기획 요구사항 대응표](docs/REQUIREMENTS_TRACEABILITY.md) | 저장소 기획 범위와 구현·시험 대응 |
 | [검증 보고서](docs/TEST_REPORT.md) | 실제 실행한 검증과 아직 실행하지 못한 검증 |
-| [전체 파일 목록](docs/FILE_MANIFEST.md) | 배포 ZIP의 전체 파일 목록 |
+| [파일 구성](docs/FILE_MANIFEST.md) | 현재 소스의 역할과 전체 추적 파일 확인 방법 |
 
 ## 5. 팀에 먼저 공유할 결정 사항
 
 현재 `config/recommendation-policy.json`은 분야 35 / 학과 25 / 학적 15 / 학년 10 / 활동 15의 제안값입니다.
 시간 요소는 가산하지 않습니다. 확인되지 않은 자격 조건에는 일치 점수를 주지 않습니다.
-임박 기간은 화면에서 `closing_days`로 명시해 요청합니다. 설정 파일의 7일은 화면 설계를 위한 제안입니다.
+임박 기간은 현재 React에서 `closing_days=7`로 요청합니다.
 
 관심사 15개는 `app/reference.py`의 제안 사전입니다.
 학과·학적 입력, 분야와 활동을 각각 하나 이상 선택해야 추천 API가 동작합니다.

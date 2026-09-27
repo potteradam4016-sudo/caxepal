@@ -3,13 +3,13 @@
 ## 1. 전체 흐름
 
 ```text
-공식 게시판 3곳
+순천대학교 대표 게시판 (작성자 출처 6종 분류)
     -> app/crawlers (안전한 HTTP 요청, HTML 해석)
     -> app/services/crawl (중복·변경 확인)
     -> app/services/analysis (구조화, 근거 검증)
     -> DB (원문과 분석 분리)
     -> app/api (조회, 추천, 찜, 캘린더)
-    -> 향후 프론트엔드
+    -> React 프론트엔드
 
 사용자 -> 인증 API -> DB 세션 -> 본인 프로필·찜
 관리자 -> 작업 접수 -> DB 작업 큐 -> 별도 worker -> 수집 결과
@@ -53,13 +53,14 @@ API 요청 처리 중 긴 크롤링을 실행하지 않습니다.
 | interests / profile_interests | 사전과 사용자 선택 |
 | auth_sessions | 로그인 토큰 해시·만료 |
 | sources | 대표 공지 활성 상태, 이전 출처 비활성 기록, 마지막 성공 |
-| notices | 원문 ID·제목·텍스트·게시일·원문 URL·첨부 정보·hash |
+| notices | 원문 ID·제목·텍스트·게시일·작성자·출처 분류·원문 URL·첨부 정보·hash |
 | notice_analyses | 구조화 JSON, 상태, 검수·마감 조회 필드 |
 | bookmarks | 사용자-공지 찜, 복합 기본키 |
 | crawl_jobs | 영속 수집 작업, 인수·시도·상태·결과 |
 | crawl_runs | 출처별 수집 실행, 건수와 오류 |
 | leases | worker·scheduler의 독점 처리 상태 |
 | rate_buckets | 공유 요청 제한 횟수 |
+| audit_logs | 보안·관리자 작업 기록 |
 
 원문 공지는 `(source_code, external_id)` 유일 제약으로 중복을 막습니다.
 계정 삭제 시 프로필·관심 선택·세션·찜은 외래키 cascade로 삭제합니다.
@@ -68,8 +69,8 @@ epoch timestamp 열은 BIGINT입니다.
 
 `python -m app.cli init-db`는 Alembic `0003`까지 적용한 후 출처/관심사 사전을 갱신합니다.
 대표 공지의 작성자와 6종 출처 분류를 저장하며, 이전 SW·AI 게시판 출처는 비활성화합니다.
-반복 실행해도 사용자·공지·기존 reference 설정을 초기화하지 않습니다.
-reference seed는 기존 행을 자동 수정하거나 삭제하지 않으므로 사전 변경 시 데이터 마이그레이션이 필요합니다.
+반복 실행해도 사용자·공지를 초기화하지 않습니다.
+reference seed는 기존 출처의 `enabled`를 코드의 활성 정책으로 갱신합니다. 관심사는 없는 항목만 추가하므로 기존 관심사 변경에는 별도 데이터 마이그레이션이 필요합니다.
 개발 API 시작 시 임의 `create_all()`로 스키마를 변경하지 않습니다.
 
 ## 4. 인증 방식
